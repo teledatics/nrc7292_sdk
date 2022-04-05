@@ -50,6 +50,31 @@ NETIFFILES= \
 	bridgeif_fdb.c \
 	slipif.c
 
+# PPPFILES: PPP
+PPPFILES= \
+	auth.c \
+	ccp.c \
+	chap-md5.c \
+	chap_ms.c \
+	chap-new.c \
+	demand.c \
+	eui64.c \
+	fsm.c \
+	ipcp.c \
+	ipv6cp.c \
+	lcp.c \
+	magic.c \
+	mppe.c \
+	multilink.c \
+	ppp.c \
+	pppapi.c \
+	pppcrypt.c \
+	pppoe.c \
+	pppol2tp.c \
+	pppos.c \
+	upap.c \
+	vj.c
+
 # PORTING_FILES
 LWIP_PORTING = \
 	sys_arch.c \
@@ -76,6 +101,7 @@ CSRCS += \
 	$(CORE4FILES) \
 	$(APIFILES) \
 	$(NETIFFILES) \
+	$(PPPFILES) \
 	$(LWIP_PORTING)\
 	$(LWIP_APPS) \
 	$(LWIP_PORTING_ETH)

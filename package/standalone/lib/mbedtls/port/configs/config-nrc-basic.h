@@ -58,6 +58,7 @@
 #define MBEDTLS_DES_C
 #define MBEDTLS_ENTROPY_C
 #define MBEDTLS_MD_C
+#define MBEDTLS_MD4_C
 #define MBEDTLS_MD5_C
 #define MBEDTLS_NET_C
 #define MBEDTLS_OID_C

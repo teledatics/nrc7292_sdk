@@ -9,6 +9,7 @@ LWIP_INC		= $(LWIP_SRC_BASE)/include
 LWIP_CORE		= $(LWIP_SRC_BASE)/core
 LWIP_API		= $(LWIP_SRC_BASE)/api
 LWIP_NETIF		= $(LWIP_SRC_BASE)/netif
+LWIP_PPP		= $(LWIP_SRC_BASE)/netif/ppp
 LWIP_APPS_SRC	= $(LWIP_SRC_BASE)/apps
 LWIP_IPV4		= $(LWIP_CORE)/ipv4
 LWIP_APPS_PORT	= $(LWIP_PORT)/apps
@@ -329,4 +330,13 @@ ifeq ($(CONFIG_BME680), y)
 
     include $(BME680_BASE)/bme680.make
 	DEFINE	+= -DSUPPORT_BME680
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// LWIP PPP
+#// put at end due to binary only library libModem.a dependency problems
+#// --------------------------------------------------
+ifeq ($(CONFIG_LWIP), y)
+	VPATH	+= $(LWIP_PPP)
 endif

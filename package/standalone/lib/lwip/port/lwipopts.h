@@ -293,7 +293,7 @@ a lot of data that needs to be copied, this should be set high. */
 /* Define IP_FORWARD to 1 if you wish to have the ability to forward
    IP packets across network interfaces. If you are going to run lwIP
    on a device with only one network interface, define this to 0. */
-#define IP_FORWARD              0
+#define IP_FORWARD              1
 
 /* IP reassembly and segmentation.These are orthogonal even
  * if they both deal with IP fragments */
@@ -346,6 +346,21 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* LWIP_STATS==1: Enable statistics collection in lwip_stats.  */
 #define LWIP_STATS 1
+
+#define LWIP_USE_EXTERNAL_MBEDTLS 1
+
+/* ---------- PPP options ---------- */
+#define PPP_SUPPORT 1
+#define PPPOS_SUPPORT PPP_SUPPORT
+#define PPP_IPV4_SUPPORT 1
+// #define PAP_SUPPORT 1
+// #define CHAP_SUPPORT 1
+// #define MSCHAP_SUPPORT 1
+// #define CCP_SUPPORT 1
+// #define IPCP_SUPPORT 1
+// #define MPPE_SUPPORT 1
+// #define VJ_SUPPORT 1
+// #define PPP_LCP_ADAPTIVE 1
 
 #if defined(TS8266) || defined(TR6260)
 #define LWIP_TIMEVAL_PRIVATE 1

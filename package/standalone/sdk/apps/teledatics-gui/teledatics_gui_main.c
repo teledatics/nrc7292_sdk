@@ -32,22 +32,50 @@
 
 #include "teledatics_gui.h"
 
-
-#define SCB_AIRCR_ADDRESS        ( 0xE000ED0C )
-#define SCB_AIRCR                ( ( volatile unsigned long* ) SCB_AIRCR_ADDRESS )
-#define SCB_AIRCR_VECTKEY        ( 0x5FA << 16 )
-#define SCB_AIRCR_SYSRESETREQ    ( 0x1 << 2 )
 /**
- * @brief restart system
+ * @brief validate parameter settings
  * 
- * Force system to restart
+ * Validate critical wifi parameters, set to defaults if out of range
  * 
- * @param none
- * @returns none
+ * @param wifi configuration ptr
+ * @returns nrc_err_t
  */
-void restart_system(void)
+nrc_err_t td_validate_params(td_wifi_config_t *tf_config)
 {
-        *SCB_AIRCR = SCB_AIRCR_SYSRESETREQ | SCB_AIRCR_VECTKEY;
+        if(!tf_config)
+                return NRC_FAIL;
+        
+        if(tf_config->nrc_wifi_config.count < WIFI_MIN_COUNT || 
+           tf_config->nrc_wifi_config.count > WIFI_MAX_COUNT) {
+                nrc_usr_print("count %d out of range %d to %d\n", tf_config->nrc_wifi_config.count, WIFI_MIN_COUNT, WIFI_MAX_COUNT);
+                tf_config->nrc_wifi_config.count = TD_WIFI_COUNT_DEFAULT;
+        }
+        
+        if(tf_config->nrc_wifi_config.interval < WIFI_MIN_INTERVAL || 
+           tf_config->nrc_wifi_config.interval > WIFI_MAX_INTERVAL) {
+                nrc_usr_print("interval %d out of range %d to %d\n", tf_config->nrc_wifi_config.interval, WIFI_MIN_INTERVAL, WIFI_MAX_INTERVAL);
+                tf_config->nrc_wifi_config.interval = TD_WIFI_INTERVAL_DEFAULT;
+        }
+        
+        if(tf_config->nrc_wifi_config.short_bcn_interval < WIFI_MIN_BCN_INTERVAL || 
+           tf_config->nrc_wifi_config.short_bcn_interval > WIFI_MAX_BCN_INTERVAL) {
+                nrc_usr_print("short_bcn_interval %d out of range %d to %d\n", tf_config->nrc_wifi_config.short_bcn_interval, WIFI_MIN_BCN_INTERVAL, WIFI_MAX_BCN_INTERVAL);
+                tf_config->nrc_wifi_config.short_bcn_interval = TD_WIFI_SHORT_BCN_INTERVAL_DEFAULT;
+        }
+        
+        if(tf_config->nrc_wifi_config.duration < WIFI_MIN_DURATION || 
+           tf_config->nrc_wifi_config.duration > WIFI_MAX_DURATION) {
+                nrc_usr_print("duration %d out of range %d to %d\n", tf_config->nrc_wifi_config.duration, WIFI_MIN_DURATION, WIFI_MAX_DURATION);
+                tf_config->nrc_wifi_config.duration = TD_WIFI_DURATION_DEFAULT;
+        }
+
+        if(tf_config->nrc_wifi_config.tx_power < WIFI_MIN_TXPOWER || 
+           tf_config->nrc_wifi_config.tx_power > WIFI_MAX_TXPOWER) {
+                nrc_usr_print("tx_power %d out of range %d to %d\n", tf_config->nrc_wifi_config.tx_power, WIFI_MIN_TXPOWER, WIFI_MAX_TXPOWER);
+                tf_config->nrc_wifi_config.tx_power = TD_WIFI_TXPOWER_DEFAULT;
+        }
+
+        return NRC_SUCCESS;
 }
 
 /**
@@ -72,6 +100,12 @@ void td_print_settings(td_wifi_config_t *tf_config)
         nrc_usr_print("ap ip %s\n", tf_config->nrc_wifi_config.ap_ip);
         nrc_usr_print("static ipv6 %s\n", tf_config->ipv6_addr);
         nrc_usr_print("dhcp_server %d\n", tf_config->nrc_wifi_config.dhcp_server);
+        nrc_usr_print("count %d\n", tf_config->nrc_wifi_config.count);
+        nrc_usr_print("interval %d\n", tf_config->nrc_wifi_config.interval);
+        nrc_usr_print("short bcn interval %d\n", tf_config->nrc_wifi_config.short_bcn_interval);
+        nrc_usr_print("duration %d\n", tf_config->nrc_wifi_config.duration);
+        nrc_usr_print("txpower %d\n", tf_config->nrc_wifi_config.tx_power);
+        nrc_usr_print("ppp_enable %d\n", tf_config->ppp_enable);
 }
 
 /**
@@ -87,6 +121,7 @@ nrc_err_t td_save_wifi_config(td_wifi_config_t *tf_config)
         nvs_err_t err = NVS_OK;
         nvs_handle_t nvs_handle = 0;
         size_t length = 0;
+        int32_t nvs_signed_int = 0;
 
         if(!tf_config)
                 goto failed;
@@ -94,7 +129,9 @@ nrc_err_t td_save_wifi_config(td_wifi_config_t *tf_config)
         err = nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle);
         if(NVS_OK != err)
                 goto failed;
-
+        
+        td_validate_params(tf_config);
+        
         nvs_set_u8 (nvs_handle, TD_WIFI_MODE_TAG, tf_config->wifi_mode);
         nvs_set_str(nvs_handle, TD_WIFI_SSID_TAG, (char*) tf_config->nrc_wifi_config.ssid);
         nvs_set_str(nvs_handle, TD_WIFI_PASSWORD_TAG, (char*) tf_config->nrc_wifi_config.password);
@@ -108,6 +145,16 @@ nrc_err_t td_save_wifi_config(td_wifi_config_t *tf_config)
         nvs_set_str(nvs_handle, TD_WIFI_REMOTE_IP_TAG, (char*) tf_config->nrc_wifi_config.remote_addr);
         nvs_set_u16 (nvs_handle, TD_WIFI_REMOTE_PORT_TAG, tf_config->nrc_wifi_config.remote_port);
         nvs_set_u8 (nvs_handle, TD_WIFI_DHCP_SERVER_TAG, tf_config->nrc_wifi_config.dhcp_server);
+        nvs_set_u8 (nvs_handle, TD_WIFI_COUNT_TAG, tf_config->nrc_wifi_config.count);
+        nvs_signed_int = (int32_t)tf_config->nrc_wifi_config.interval;
+        nvs_set_i32 (nvs_handle, TD_WIFI_INTERVAL_TAG, nvs_signed_int);
+        nvs_signed_int = (int32_t)tf_config->nrc_wifi_config.short_bcn_interval;
+        nvs_set_i32 (nvs_handle, TD_WIFI_SHORT_BCN_INTERVAL_TAG, nvs_signed_int);
+        nvs_signed_int = (int32_t)tf_config->nrc_wifi_config.duration;
+        nvs_set_i32 (nvs_handle, TD_WIFI_DURATION_TAG, nvs_signed_int);
+        nvs_signed_int = (int32_t)tf_config->nrc_wifi_config.tx_power;
+        nvs_set_i32 (nvs_handle, TD_WIFI_TXPOWER_TAG, nvs_signed_int);
+        nvs_set_u8 (nvs_handle, TD_PPP_ENABLE_TAG, tf_config->ppp_enable);
 
        err =  nvs_commit(nvs_handle);
 
@@ -116,8 +163,6 @@ nrc_err_t td_save_wifi_config(td_wifi_config_t *tf_config)
         
         if(nvs_handle)
                 nvs_close(nvs_handle);
-        
-        td_print_settings(tf_config);
 
         return NRC_SUCCESS;
 
@@ -133,18 +178,22 @@ failed:
 /**
  * @brief set default configuration
  * 
- * Save default configuration to key+value storage
+ * Set default wifi configuration in memory
  * 
  * @param wifi configuration ptr
  * @returns nrc_err_t
  */
-nrc_err_t td_set_wifi_default(td_wifi_config_t *tf_config)
+nrc_err_t td_set_wifi_defaults(td_wifi_config_t *tf_config)
 {
         if(!tf_config)
                 return NRC_FAIL;
 
-        nrc_usr_print("[%s] b4 set default values\n", __func__);
-        
+#if NRC_WIFI_SCAN_LIST
+	tf_config->nrc_wifi_config.scan_freq_num = NRC_WIFI_SCAN_FREQ_NUM;
+	for (int i=0; i < tf_config->nrc_wifi_config.scan_freq_num; i++)
+		tf_config->nrc_wifi_config.scan_freq_list[i] = nrc_scan_freq_list[i];
+#endif
+
         tf_config->wifi_mode = TD_WIFI_MODE_DEFAULT;
         memcpy(tf_config->nrc_wifi_config.ssid, TD_WIFI_SSID_DEFAULT, sizeof(TD_WIFI_SSID_DEFAULT));
         memcpy(tf_config->nrc_wifi_config.password, TD_WIFI_PASSWORD_DEFAULT, sizeof(TD_WIFI_PASSWORD_DEFAULT));
@@ -158,10 +207,34 @@ nrc_err_t td_set_wifi_default(td_wifi_config_t *tf_config)
         tf_config->nrc_wifi_config.dhcp_server = TD_WIFI_DHCP_SERVER_DEFAULT;
         memcpy(tf_config->nrc_wifi_config.remote_addr, TD_WIFI_REMOTE_IP_DEFAULT, sizeof(TD_WIFI_REMOTE_IP_DEFAULT));
         tf_config->nrc_wifi_config.remote_port = TD_WIFI_REMOTE_PORT_DEFAULT;
-
+        tf_config->nrc_wifi_config.count = TD_WIFI_COUNT_DEFAULT;
+        tf_config->nrc_wifi_config.interval = TD_WIFI_INTERVAL_DEFAULT;
+        tf_config->nrc_wifi_config.short_bcn_interval = TD_WIFI_SHORT_BCN_INTERVAL_DEFAULT;
+        tf_config->nrc_wifi_config.duration = TD_WIFI_DURATION_DEFAULT;
+        tf_config->nrc_wifi_config.tx_power = TD_WIFI_TXPOWER_DEFAULT;
+        tf_config->ppp_enable = TD_PPP_ENABLE_DEFAULT;
+        
         td_print_settings(tf_config);
         
-        nrc_usr_print("[%s] b4 td_save_wifi_config\n", __func__);
+        return NRC_SUCCESS;
+}
+
+/**
+ * @brief save default configuration
+ * 
+ * Save default configuration to key+value storage
+ * 
+ * @param wifi configuration ptr
+ * @returns nrc_err_t
+ */
+nrc_err_t td_save_wifi_defaults(td_wifi_config_t *tf_config)
+{
+        if(!tf_config)
+                return NRC_FAIL;
+        
+        td_set_wifi_defaults(tf_config);
+
+        td_print_settings(tf_config);
         
         return td_save_wifi_config(tf_config);
 }
@@ -180,26 +253,18 @@ nrc_err_t td_get_wifi_config(td_wifi_config_t *tf_config)
         nvs_err_t err = NVS_OK;
         nvs_handle_t nvs_handle = 0;
         size_t length = 0;
+        int32_t nvs_signed_int = 0;
 
         if(!tf_config)
                 goto failed;
-
-        nrc_usr_print("[%s] b4 memset\n", __func__);
         
         memset(tf_config, 0x0, sizeof(td_wifi_config_t));
 
-        // get Newracom defaults NOTE: temporary
-        set_wifi_config(&tf_config->nrc_wifi_config);
-        set_wifi_softap_config(&tf_config->nrc_wifi_config);
-        // TODO set & store misc params
-        
-        nrc_usr_print("[%s] b4 nvs_open\n", __func__);
+        td_set_wifi_defaults(tf_config);
         
         err = nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle);
         if(NVS_OK != err)
                 goto failed;
-        
-        nrc_usr_print("[%s] b4 nvs_get_u8\n", __func__);
 
         err = nvs_get_u8(nvs_handle, TD_WIFI_MODE_TAG, &tf_config->wifi_mode);
         
@@ -208,18 +273,14 @@ nrc_err_t td_get_wifi_config(td_wifi_config_t *tf_config)
         if(NVS_ERR_NVS_NOT_FOUND == err) { /* no configuration set */
                 nvs_close(nvs_handle);
 
-                nrc_usr_print("[%s] b4 td_set_wifi_default\n", __func__);
+                nrc_usr_print("[%s] configuration empty, saving default\n", __func__);
                 
-                td_set_wifi_default(tf_config);
-                
-                nrc_usr_print("[%s] b4 nvs_open\n", __func__);
+                td_save_wifi_defaults(tf_config);
 
                 err = nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle);
                 if(NVS_OK != err)
                         goto failed;
         }
-
-        nrc_usr_print("[%s] b4 get wifi settings\n", __func__);
 
         nvs_get_u8 (nvs_handle, TD_WIFI_MODE_TAG, (uint8_t*) &tf_config->wifi_mode);
         nvs_get_str(nvs_handle, TD_WIFI_SSID_TAG, (char*) tf_config->nrc_wifi_config.ssid, &length);
@@ -234,8 +295,18 @@ nrc_err_t td_get_wifi_config(td_wifi_config_t *tf_config)
         nvs_get_str(nvs_handle, TD_WIFI_REMOTE_IP_TAG, (char*) tf_config->nrc_wifi_config.remote_addr, &length);
         nvs_get_u16 (nvs_handle, TD_WIFI_REMOTE_PORT_TAG, (uint16_t*) &tf_config->nrc_wifi_config.remote_port);
         nvs_get_u8 (nvs_handle, TD_WIFI_DHCP_SERVER_TAG, (uint8_t*) &tf_config->nrc_wifi_config.dhcp_server);
-
-        nrc_usr_print("[%s] b4 nvs_handle\n", __func__);
+        nvs_get_u8 (nvs_handle, TD_WIFI_COUNT_TAG, (uint8_t*) &tf_config->nrc_wifi_config.count);
+        nvs_get_i32 (nvs_handle, TD_WIFI_INTERVAL_TAG, &nvs_signed_int);
+        tf_config->nrc_wifi_config.interval = nvs_signed_int;
+        nvs_get_i32 (nvs_handle, TD_WIFI_SHORT_BCN_INTERVAL_TAG, &nvs_signed_int);
+        tf_config->nrc_wifi_config.short_bcn_interval = nvs_signed_int;
+        nvs_get_i32 (nvs_handle, TD_WIFI_TXPOWER_TAG, &nvs_signed_int);
+        tf_config->nrc_wifi_config.tx_power = nvs_signed_int;
+        nvs_get_i32 (nvs_handle, TD_WIFI_DURATION_TAG, &nvs_signed_int);
+        tf_config->nrc_wifi_config.duration = nvs_signed_int;
+        nvs_get_u8 (nvs_handle, TD_PPP_ENABLE_TAG, (uint8_t*) &tf_config->ppp_enable);
+        
+        td_validate_params(tf_config);
 
         if(nvs_handle)
                 nvs_close(nvs_handle);
@@ -324,24 +395,19 @@ void user_init(void)
 {
         td_wifi_config_t tf_config; 
 
-nrc_usr_print ("[%s] b4 td_init\n", __func__);
+        nrc_usr_print ("[%s] \n", __func__);
 
         if (td_init(&tf_config) != NRC_SUCCESS) {
                 return;
         }
 
-// td_set_wifi_default(&tf_config);
-
-        if(td_run_wifi(&tf_config) != NRC_SUCCESS) {
-                return;
+        if(tf_config.ppp_enable) {
+                td_start_ppp();
         }
 
-
-        nrc_usr_print ("[%s] while loop\n", __func__);
-//phy_state_print();
-
 	while(should_quit == 0) {
-		_delay_ms(1);
+                td_run_wifi(&tf_config);
+                _delay_ms(1);
 	}
 
 }

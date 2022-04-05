@@ -39,43 +39,6 @@ extern const char html_base64[];
 httpd_handle_t http_server = NULL;
 
 /**
- * @brief insert new string in place of old string within destination string
- * 
- * String substitution utility
- * 
- * @param destination string
- * @param string to replace
- * @param string to insert
- * @returns pointer to destination string on success, NULL on failure
- */
-char *subst_string(char* dest, char *old, const char *new) 
-{
-        char* p;
-        size_t dl,ol,nl,tl;
-
-        if(!dest || !old || !new)
-                return NULL;
-
-        p = strstr(dest, old);
-
-        if(!p)
-                return NULL;
-
-        dl = strlen(dest) + 1;
-        ol = strlen(old);
-        nl = strlen(new);
-        tl = dl - (p - dest) - ol;
-
-        if(dl == 1 || dl < ol)
-                return NULL;
-
-        memmove(p + nl, p + ol, tl);
-        memcpy (p, new,  nl);
-
-        return dest;
-}
-
-/**
  * @brief substitute settings in HTML
  * 
  * Macro substitution of current settings
@@ -158,6 +121,24 @@ int subst_wifi_values(char *html, td_wifi_config_t *tf_config)
                                 case WIFI_DHCPSERVER_SUBST:
                                         snprintf(val, sizeof(val)-1, "%d", tf_config->nrc_wifi_config.dhcp_server);
                                         break;
+                                case WIFI_INTERVAL_SUBST:
+                                        snprintf(val, sizeof(val)-1, "%d", tf_config->nrc_wifi_config.interval);
+                                        break;
+                                case WIFI_SHORT_BCN_INTERVAL_SUBST:
+                                        snprintf(val, sizeof(val)-1, "%d", tf_config->nrc_wifi_config.short_bcn_interval);
+                                        break;
+                                case WIFI_TXPOWER_SUBST:
+                                        snprintf(val, sizeof(val)-1, "%d", tf_config->nrc_wifi_config.tx_power);
+                                        break;
+                                case WIFI_COUNT_SUBST:
+                                        snprintf(val, sizeof(val)-1, "%d", tf_config->nrc_wifi_config.count);
+                                        break;
+                                case WIFI_DURATION_SUBST:
+                                        snprintf(val, sizeof(val)-1, "%d", tf_config->nrc_wifi_config.duration);
+                                        break;
+                                case PPP_ENABLE_SUBST:
+                                        snprintf(val, sizeof(val)-1, "%d", tf_config->ppp_enable);
+                                        break;
                                 default:
                                         break;
                         }
@@ -171,7 +152,7 @@ int subst_wifi_values(char *html, td_wifi_config_t *tf_config)
 }
 
 // global HTML buffer
-static char html_buffer[98302];
+static char html_buffer[HTML_BUF_LEN];
 
 /**
  * @brief http configuration handler callback
@@ -321,10 +302,49 @@ esp_err_t update_settings_handler(httpd_req_t *req)
                                 
                                 tf_config->nrc_wifi_config.dhcp_server = atoi(tmp);
                         }
+                        
+                        if (httpd_query_key_value(html_buffer, "wifi_interval", (char *) tmp, sizeof(tmp)) == ESP_OK) {
+                                nrc_usr_print ("Found URL query parameter => wifi_interval=%s\n", tmp);
+                                
+                                tf_config->nrc_wifi_config.interval = atoi(tmp);
+                        }
+                        
+                        if (httpd_query_key_value(html_buffer, "wifi_bcn_interval", (char *) tmp, sizeof(tmp)) == ESP_OK) {
+                                nrc_usr_print ("Found URL query parameter => wifi_bcn_interval=%s\n", tmp);
+                                
+                                tf_config->nrc_wifi_config.short_bcn_interval = atoi(tmp);
+                        }
+                        
+                        if (httpd_query_key_value(html_buffer, "wifi_txpower", (char *) tmp, sizeof(tmp)) == ESP_OK) {
+                                nrc_usr_print ("Found URL query parameter => wifi_txpower=%s\n", tmp);
+                                
+                                tf_config->nrc_wifi_config.tx_power = atoi(tmp);
+                        }
+                        
+                        if (httpd_query_key_value(html_buffer, "wifi_count", (char *) tmp, sizeof(tmp)) == ESP_OK) {
+                                nrc_usr_print ("Found URL query parameter => wifi_count=%s\n", tmp);
+                                
+                                tf_config->nrc_wifi_config.count = atoi(tmp);
+                        }
+                        
+                        if (httpd_query_key_value(html_buffer, "wifi_duration", (char *) tmp, sizeof(tmp)) == ESP_OK) {
+                                nrc_usr_print ("Found URL query parameter => wifi_duration=%s\n", tmp);
+                                
+                                tf_config->nrc_wifi_config.duration = atoi(tmp);
+                        }
+                        
+                        if (httpd_query_key_value(html_buffer, "ppp_enable", (char *) tmp, sizeof(tmp)) == ESP_OK) {
+                                nrc_usr_print ("Found URL query parameter => ppp_enable=%s\n", tmp);
+                                
+                                tf_config->ppp_enable = atoi(tmp);
+                        }
                 }
 
-                td_print_settings(tf_config);
+                td_validate_params(tf_config);
                 td_save_wifi_config(tf_config);
+                td_print_settings(tf_config);
+                
+                _delay_ms(1000);
                 
                 restart_system();
                 
@@ -354,6 +374,11 @@ httpd_handle_t run_http_server(td_wifi_config_t* tf_config)
 {
         httpd_config_t conf = HTTPD_DEFAULT_CONFIG();
 
+        if(http_server) {
+                httpd_stop(http_server);
+                http_server=NULL;
+        }
+        
         if (httpd_start(&http_server, &conf) == ESP_OK) {
                 nrc_usr_print("httpd server on port : %d\n", conf.server_port);
         }

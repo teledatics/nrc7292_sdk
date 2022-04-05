@@ -32,6 +32,168 @@
  
  #include "teledatics_gui.h"
  
+#include "lwip/netif.h"
+extern struct netif* nrc_netif[];
+
+static void td_wifi_event_handler(tWIFI_EVENT_ID event, int data_len, char* data)
+{
+	char* ip_addr = NULL;
+	tWIFI_STATUS ret = WIFI_FAIL;
+	int cnt = 0;
+
+	switch(event) {
+		case WIFI_EVT_CONNECT_SUCCESS:
+			nrc_usr_print("[%s] Receive Connection Success Event\n", __func__);
+			if (!netif_is_link_up(nrc_netif[0])) {
+				netif_set_link_up(nrc_netif[0]);
+			}
+
+			do {
+				ret = nrc_wifi_set_ip_address();
+				if(ret != WIFI_SUCCESS) {
+					cnt++;
+					nrc_usr_print("[%s] Fail to set IP addr(cnt %d)\n", __func__,cnt);
+				}
+				if(cnt == MAX_WIFI_CONNECT_TRIES) {
+					nrc_wifi_set_state(WIFI_STATE_TRY_DISASSOC);
+					break;
+				}
+			} while(ret != WIFI_SUCCESS);
+
+			break;
+		case WIFI_EVT_CONNECT_FAIL:
+			nrc_usr_print("[%s] Receive Connection Fail Event\n", __func__);
+			break;
+		case WIFI_EVT_GET_IP:
+			nrc_usr_print("[%s] Receive IP_GET Success Event\n", __func__);
+			if( nrc_wifi_get_ip_address(&ip_addr) == WIFI_SUCCESS) {
+				nrc_usr_print("[%s] IP Address : %s\n", __func__, ip_addr ? ip_addr : "null");
+			}
+			break;
+		case WIFI_EVT_GET_IP_FAIL:
+			nrc_usr_print("[%s] Receive IP_GET Fail Event\n", __func__);
+			break;
+		case WIFI_EVT_DISCONNECT:
+			nrc_usr_print("[%s] Receive Disconnection Event\n", __func__);
+			/* send netif down indication to LWIP */
+			if (netif_is_link_up(nrc_netif[0])) {
+				netif_set_link_down(nrc_netif[0]);
+			}
+			break;
+		case WIFI_EVT_SCAN_DONE:
+			nrc_usr_print("[%s] Receive Scan Done Event\n", __func__);
+			break;
+		case WIFI_EVT_START_SOFT_AP:
+			nrc_usr_print("[%s] Receive Start Soft AP Event\n", __func__);
+			break;
+		case WIFI_EVT_SET_SOFT_AP_IP:
+			nrc_usr_print("[%s] Receive SET IP Event\n", __func__);
+			if( nrc_wifi_get_ip_address(&ip_addr) == WIFI_SUCCESS) {
+				nrc_usr_print("[%s] IP Address : %s\n", __func__, ip_addr);
+			}
+			break;
+		case WIFI_EVT_START_DHCP_SERVER:
+			nrc_usr_print("[%s] Receive Start DHCPS Event\n", __func__);
+			break;
+		default:
+			nrc_usr_print("[%s] Receive Unknown Event %d\n", __func__, event);
+			break;
+	}
+}
+
+int td_wifi_init(WIFI_CONFIG *param)
+{
+	int txpower;
+
+	/* Register Wi-Fi Event Handler */
+	nrc_wifi_register_event_handler(td_wifi_event_handler);
+
+	/* Set IP mode config (Dynamic IP(DHCP client) or STATIC IP) */
+	if (nrc_wifi_set_ip_mode((bool)param->ip_mode, (char *)param->static_ip)<0) {
+		nrc_usr_print("[%s] Fail to set static IP \n", __func__);
+		return WIFI_SET_IP_FAIL;
+	}
+
+	/* Set TX Power */
+	txpower = param->tx_power;
+
+	if(nrc_wifi_set_tx_power(txpower) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail set TX Power\n", __func__);
+		return WIFI_FAIL;
+	}
+	txpower = 0;
+	nrc_wifi_get_tx_power(&txpower);
+	nrc_usr_print("[%s] TX Power (%d dBm)\n", __func__, txpower);
+
+	/* Set Country Code */
+	if(nrc_wifi_set_country(nrc_wifi_country_from_string((char *)param->country)) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set Country\n", __func__);
+		return WIFI_FAIL;
+	}
+
+	return WIFI_SUCCESS;
+}
+
+int td_wifi_connect(td_wifi_config_t* tf_config)
+{
+	int index = -1;
+
+	/* Try to connect with ssid and security */
+	nrc_usr_print("[%s] Trying to Wi-Fi Connection...\n",__func__);
+
+	if (nrc_wifi_add_network(&index) < 0) {
+		nrc_usr_print("[%s] Fail to init \n", __func__);
+		return WIFI_INIT_FAIL;
+	}
+
+	if (nrc_wifi_set_ssid(index, (char *)tf_config->nrc_wifi_config.ssid) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set SSID\n", __func__);
+		return WIFI_FAIL;
+	}
+
+	if (strlen((char *)tf_config->nrc_wifi_config.bssid) != 0){
+		if (nrc_wifi_set_bssid(index, (char *)tf_config->nrc_wifi_config.bssid) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to set BSSID\n", __func__);
+			return WIFI_FAIL;
+		}
+	}
+
+	/* Set Non-S1G channel */
+	if(tf_config->nrc_wifi_config.s1g_channel != 0) {
+		if(nrc_wifi_set_s1g_config(tf_config->nrc_wifi_config.s1g_channel) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to set S1G channel\n", __func__);
+			return WIFI_FAIL;
+		}
+	}
+
+	if (nrc_wifi_set_security(index, (int)tf_config->nrc_wifi_config.security_mode, (char *)tf_config->nrc_wifi_config.password) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set Security\n", __func__);
+		return WIFI_FAIL;
+	}
+
+	if (nrc_wifi_set_scan_freq(index,tf_config->nrc_wifi_config.scan_freq_list, tf_config->nrc_wifi_config.scan_freq_num) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set Scan Freq\n", __func__);
+		return WIFI_FAIL;
+	}
+
+	if (nrc_wifi_connect(index) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to Connect\n", __func__);
+		return WIFI_CONNECTION_FAIL;
+	}
+	
+	// static IP, run server now
+	if(tf_config->nrc_wifi_config.ip_mode == WIFI_STATIC_IP) {
+		run_http_server(tf_config);
+	}
+
+	if (nrc_wifi_set_ip_address() != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set IP Address\n", __func__);
+		return WIFI_SET_IP_FAIL;
+	}
+		
+ 	return WIFI_SUCCESS;
+}
+
 /**
  * @brief shutdown access point wifi
  * 
@@ -143,7 +305,7 @@ nrc_err_t td_run_wifi_ap(td_wifi_config_t* tf_config)
         if(!tf_config)
                 goto failed;
 
-        td_wifi_reset();
+//         td_wifi_reset();
 	
 	/* set initial wifi configuration */
 	for(max_tries=0; max_tries < MAX_WIFI_INIT_TRIES; max_tries++) {
@@ -231,29 +393,30 @@ nrc_err_t td_run_wifi_client(td_wifi_config_t* tf_config)
         if(!tf_config)
                 goto failed;
 
-	td_wifi_reset();
+// 	td_wifi_reset();
 		
 	count = tf_config->nrc_wifi_config.count;
 	dhcp_server = tf_config->nrc_wifi_config.dhcp_server;
 
 	if (wifi_init(&tf_config->nrc_wifi_config)!= WIFI_SUCCESS) {
 		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
-		return NRC_FAIL;
+		goto failed;
 	}
 
 	nrc_usr_print ("[%s] Trying to connect to AP - %s...\n", __func__, tf_config->nrc_wifi_config.ssid);
 	do {
-		if (wifi_connect(&tf_config->nrc_wifi_config) == WIFI_SUCCESS) {
+		if (td_wifi_connect(tf_config) == WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] Wi-Fi connection successful...\n", __func__);
 			break;
 		}
+		
 		nrc_usr_print ("[%s] Connect to AP(%s) timed out, trying again...\n", __func__, tf_config->nrc_wifi_config.ssid);
 		i++;
 	} while (i < 10);
 
 	if (i >= 10) {
 		nrc_usr_print ("[%s] Wi-Fi connection failed. Check AP availability and SSID, and try again...\n", __func__);
-		return NRC_FAIL;
+		goto failed;
 	}
 
 	nrc_wifi_get_network_index(&network_index );
@@ -266,13 +429,18 @@ nrc_err_t td_run_wifi_client(td_wifi_config_t* tf_config)
 			nrc_usr_print("[%s] IP received!\n",__func__);
 			break;
 		}
+		
 		_delay_ms(1000);
 		i++;
 	} while (i < 10);
 
 	if (wifi_state != WIFI_STATE_GET_IP) {
 		nrc_usr_print("[%s] Fail to connect or get IP !\n",__func__);
-		return NRC_FAIL;
+		goto failed;
+	}
+	
+	if(tf_config->nrc_wifi_config.ip_mode != WIFI_STATIC_IP) {
+		run_http_server(tf_config);
 	}
 
 	nrc_usr_print("[%s] Device is online connected to %s\n",__func__, tf_config->nrc_wifi_config.ssid);
@@ -295,7 +463,7 @@ failed:
  */
 nrc_err_t td_run_wifi_mesh(td_wifi_config_t* tf_config)
 {
-        td_wifi_reset();
+//         td_wifi_reset();
 
         return NRC_SUCCESS;
 }

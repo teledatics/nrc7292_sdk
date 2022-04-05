@@ -98,6 +98,13 @@ extern "C" {
  */
 #if LWIP_USE_EXTERNAL_MBEDTLS
 
+#include "mbedtls/aes.h"
+#include "mbedtls/md4.h"
+#include "mbedtls/md5.h"
+#include "mbedtls/sha1.h"
+#include "mbedtls/des.h"
+#include "mbedtls/arc4.h"
+
 #define lwip_md4_context mbedtls_md4_context
 #define lwip_md4_init mbedtls_md4_init
 #define lwip_md4_starts mbedtls_md4_starts

@@ -64,32 +64,58 @@
 #define TD_WIFI_STATIC_IP_TAG NVS_STATIC_IP
 #define TD_WIFI_STATIC_IPV6_TAG NVS_STATIC_IP6
 #define TD_WIFI_DHCP_SERVER_TAG NVS_DHCP_SERVER_ON_WLAN
+#define TD_WIFI_COUNT_TAG "wifi_count"
+#define TD_WIFI_INTERVAL_TAG "wifi_interval"
+#define TD_WIFI_SHORT_BCN_INTERVAL_TAG "wifi_bcn"
+#define TD_WIFI_TXPOWER_TAG "wifi_txpower"
+#define TD_WIFI_DURATION_TAG "wifi_duration"
+#define TD_PPP_ENABLE_TAG "ppp_enable"
 
 #define TD_WIFI_MODE_DEFAULT WIFI_MODE_AP
 #define TD_WIFI_SSID_DEFAULT "teledatics"
 #define TD_WIFI_PASSWORD_DEFAULT TD_WIFI_SSID_DEFAULT
 #define TD_WIFI_SECURITY_DEFAULT WIFI_SEC_OPEN
-#define TD_WIFI_COUNTRY_DEFAULT "US"
-#define TD_WIFI_CHANNEL_DEFAULT 9225
+#define TD_WIFI_COUNTRY_DEFAULT COUNTRY_CODE
+#define TD_WIFI_CHANNEL_DEFAULT NRC_AP_SET_CHANNEL
 #define TD_WIFI_IP_MODE_DEFAULT WIFI_STATIC_IP;
-#define TD_WIFI_STATIC_IP_DEFAULT "192.168.200.1"
+#define TD_WIFI_STATIC_IP_DEFAULT NRC_AP_IP
 #define TD_WIFI_STATIC_IPV6_DEFAULT "fec0::1"
 #define TD_WIFI_REMOTE_IP_DEFAULT NRC_REMOTE_ADDRESS
 #define TD_WIFI_REMOTE_PORT_DEFAULT NRC_REMOTE_PORT
 #define TD_WIFI_DHCP_SERVER_DEFAULT 1
+#define TD_WIFI_COUNT_DEFAULT NRC_WIFI_TEST_COUNT
+#define TD_WIFI_INTERVAL_DEFAULT NRC_WIFI_TEST_INTERVAL
+#define TD_WIFI_SHORT_BCN_INTERVAL_DEFAULT (NRC_WIFI_TEST_INTERVAL / 10)
+#define TD_WIFI_TXPOWER_DEFAULT TX_POWER
+#define TD_WIFI_DURATION_DEFAULT NRC_WIFI_TEST_DURATION
+#define TD_PPP_ENABLE_DEFAULT 1
 
+#define WIFI_MIN_INTERVAL 100
+#define WIFI_MAX_INTERVAL 10000
+#define WIFI_MIN_BCN_INTERVAL 1
+#define WIFI_MAX_BCN_INTERVAL 300
+#define WIFI_MIN_TXPOWER 1
+#define WIFI_MAX_TXPOWER 20
+#define WIFI_MIN_COUNT 1
+#define WIFI_MAX_COUNT 100
+#define WIFI_MIN_DURATION 1000
+#define WIFI_MAX_DURATION 100000
+
+#define MAX_WIFI_CONNECT_TRIES 3
 #define MAX_WIFI_INIT_TRIES 64
+#define HTML_BUF_LEN 32767
 
 extern int should_quit;
 extern httpd_handle_t http_server;
 
 typedef struct {
         uint8_t wifi_mode;
+        uint8_t ppp_enable;
         char ipv6_addr[255];
         WIFI_CONFIG nrc_wifi_config;
 } td_wifi_config_t;
 
-void restart_system(void);
+nrc_err_t td_validate_params(td_wifi_config_t *tf_config);
 void td_print_settings(td_wifi_config_t *tf_config);
 nrc_err_t td_save_wifi_config(td_wifi_config_t *tf_config);
 nrc_err_t td_set_wifi_default(td_wifi_config_t *tf_config);
@@ -108,5 +134,11 @@ esp_err_t setup_page_http(httpd_req_t *req);
 esp_err_t update_settings_handler(httpd_req_t *req);
 httpd_handle_t run_http_server(td_wifi_config_t* tf_config);
 void stop_http_server(void);
+
+int td_start_ppp(void);
+int td_stop_ppp(void);
+
+void restart_system(void);
+char * subst_string(char* dest, char *old, const char *new);
 
 #endif /* TELEDATICS_WIFI_H */
