@@ -339,7 +339,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define SYS_STATS  1
 #endif /* STATS */
 
-#define LWIP_PROVIDE_ERRNO 1
+#define LWIP_ERRNO_STDINCLUDE 1
 
 /* Used with IP headers only */
 #define LWIP_CHKSUM_ALGORITHM 1
@@ -388,6 +388,11 @@ a lot of data that needs to be copied, this should be set high. */
 #define LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX     1
 #define LWIP_FREERTOS_SYS_ARCH_NOT_USE_RECURSIVE_MUTEX 1
 
-#define	ETHARP_SUPPORT_STATIC_ENTRIES	1
+#define ETHARP_SUPPORT_STATIC_ENTRIES	1
 
+#define LWIP_NUM_NETIF_CLIENT_DATA 1
+
+/* allow to use thread-safe functions to add/remove netif in list,
+ and to start/stop dhcp clients, using new functions from netifapi.h. */
+#define LWIP_NETIF_API 1
 #endif /* __LWIPOPTS_H__ */
