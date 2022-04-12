@@ -17,7 +17,16 @@
 
 #include <lwip/sockets.h>
 
+
+#include <util_trace.h>
+#include <esp_err.h>
+
+#include <esp_http_server.h>
+#include "../esp_httpd_priv.h"
+
 #include "ctrl_sock.h"
+
+static const int TAG = TT_SDK_HTTPD;
 
 /* Control socket, because in some network stacks select can't be woken up any
  * other way
@@ -58,6 +67,7 @@ int cs_send_to_ctrl_sock(int send_fd, int port, void *data, unsigned int data_le
     ret = sendto(send_fd, data, data_len, 0, (struct sockaddr *)&to_addr, sizeof(to_addr));
 
     if (ret < 0) {
+        E(TAG, LOG_FMT("failed to queue work %d"), errno);
         return -1;
     }
     return ret;

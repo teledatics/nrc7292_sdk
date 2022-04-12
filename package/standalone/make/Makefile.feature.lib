@@ -334,6 +334,21 @@ endif
 
 #// --------------------------------------------------
 #// LIB
+#// SHT30
+#// --------------------------------------------------
+SHT30_BASE    = $(LIB_PATH)/sht30
+
+INCLUDE += -I$(SHT30_BASE)
+
+ifeq ($(CONFIG_SHT30), y)
+    VPATH   += $(SHT30_BASE)
+
+    include $(SHT30_BASE)/sht30.make
+	DEFINE	+= -DSUPPORT_SHT30
+endif
+
+#// --------------------------------------------------
+#// LIB
 #// LWIP PPP
 #// put at end due to binary only library libModem.a dependency problems
 #// --------------------------------------------------
