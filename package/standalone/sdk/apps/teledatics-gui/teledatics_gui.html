@@ -124,24 +124,27 @@ h1{font-size:138.5%;}h2{font-size:123.1%;}h3{font-size:108%;}h1,h2,h3{margin:1em
 				};
       
       var security = [["none","None"],["wpa2","WPA2"],["wpa3_owe","WPA3-OWE"],["wpa3_sae","WPA3-SAE"]];
+  	  var websocket;
       
       function initPage()
       {
-        var wifi_mode 				= %%WIFI_MODE%%
-        var wifi_ssid					= %%WIFI_SSID%%
-        var wifi_security 		= %%WIFI_SECURITY%%
-        var wifi_password 		= %%WIFI_PASSWORD%%
-        var wifi_country 			= %%WIFI_COUNTRY%%
-        var wifi_channel 			= %%WIFI_CHANNEL%%
-        var wifi_ip_mode 			= %%WIFI_IP_MODE%%
-        var wifi_static_ip 		= %%WIFI_STATIC_IP%%
+        var wifi_mode 			= %%WIFI_MODE%%
+        var wifi_ssid				= %%WIFI_SSID%%
+        var wifi_security 	= %%WIFI_SECURITY%%
+        var wifi_password 	= %%WIFI_PASSWORD%%
+        var wifi_country 		= %%WIFI_COUNTRY%%
+        var wifi_channel 		= %%WIFI_CHANNEL%%
+        var wifi_ip_mode 		= %%WIFI_IP_MODE%%
+        var wifi_static_ip 	= %%WIFI_STATIC_IP%%
         var wifi_dhcp_server 	= %%WIFI_DHCP_SERVER%%
-        var wifi_count 				= %%WIFI_COUNT%%
-        var wifi_interval 		= %%WIFI_INTERVAL%%
-        var wifi_duration 	  = %%WIFI_DURATION%%
-        var wifi_bcn_interval = %%WIFI_SHORT_BCN_INTERVAL%%
-        var wifi_txpower 	  	= %%WIFI_TXPOWER%%
-        var ppp_enable 	  		= %%PPP_ENABLE%%
+        var wifi_count 			= %%WIFI_COUNT%%
+        var wifi_interval 	= %%WIFI_INTERVAL%%
+        var wifi_duration 	= %%WIFI_DURATION%%
+        var wifi_bcn_interval = %%WIFI_SHORT_BCN%%
+        var wifi_txpower 		= %%WIFI_TXPOWER%%
+        var ppp_enable 	  	= %%PPP_ENABLE%%
+        var accessories 	  = %%TDXPAH_ADDON%%
+
         var ipv4 = wifi_static_ip.split('.')
         
         document.getElementById('wifi_mode').value = wifi_mode
@@ -157,7 +160,7 @@ h1{font-size:138.5%;}h2{font-size:123.1%;}h3{font-size:108%;}h1,h2,h3{margin:1em
         document.getElementById('wifi_static_ip2').value = ipv4[1]
         document.getElementById('wifi_static_ip3').value = ipv4[2]
         document.getElementById('wifi_static_ip4').value = ipv4[3]
-				document.getElementById('wifi_dhcp').value = wifi_dhcp_server
+        document.getElementById('wifi_dhcp').value = wifi_dhcp_server
         if(wifi_dhcp_server)
           document.getElementById('wifi_dhcp').checked = true
         else
@@ -179,6 +182,7 @@ h1{font-size:138.5%;}h2{font-size:123.1%;}h3{font-size:108%;}h1,h2,h3{margin:1em
                 
         hideShowPasswd(wifi_security)
         hideShowStaticIPv4(wifi_ip_mode)
+        showHideAccessories(accessories)
         
         updateCount(wifi_count)
         updateInterval(wifi_interval)
@@ -188,6 +192,19 @@ h1{font-size:138.5%;}h2{font-size:123.1%;}h3{font-size:108%;}h1,h2,h3{margin:1em
         
         document.getElementById('wifi_security').value = wifi_security
         
+      }
+      
+      function showHideAccessories(accessories)
+      {
+        var accessories_div = document.getElementById("accessories_div");
+        
+        if(accessories) {
+          accessories_div.style=""
+          runWebsocket();
+        }
+        else {
+          accessories_div.style="display:none;"
+        }
       }
       
       function removeOptions(dropdown)
@@ -323,6 +340,44 @@ h1{font-size:138.5%;}h2{font-size:123.1%;}h3{font-size:108%;}h1,h2,h3{margin:1em
 				document.getElementById('wifi_txpower_output').value = wifi_txpower + " dBm";
 			}
       
+  	  function runWebsocket() 
+      {
+    		console.log('Trying to open a WebSocket connection...');
+    		websocket = new WebSocket(`ws://${window.location.hostname}/ws`);
+    		websocket.onopen    = onWSOpen;
+    		websocket.onclose   = onWSClose;
+    		websocket.onmessage = onWSMessage;
+  		}
+      
+      function runWebsocket()
+      {
+        if(websocket) {
+          websocket.send("Get data");
+        }
+      }
+      
+  		function onWSOpen(event) 
+    	{
+    		console.log('Connection opened');
+        websocket.send("Get data");
+  		}
+
+  		function onWSClose(event) 
+      {
+    		console.log('Connection closed');
+    		setTimeout(runWebsocket, 2000);
+  		}
+      
+  		function onWSMessage(message) 
+      {
+				console.log('Recv msg data:'+ message.data);
+        
+        if(message.data != '"No accessories found!') {
+    			document.getElementById('accessory_data').value = message.data;
+          setTimeout(queryWebsocket, 2000);
+        }
+  		}
+      
     </script>
     <div id="doc2" class="yui-t2">
       <div id="hd">
@@ -401,9 +456,8 @@ h1{font-size:138.5%;}h2{font-size:123.1%;}h3{font-size:108%;}h1,h2,h3{margin:1em
                 </div>
                 <p style="text-align: left;">Enable PPP&nbsp;&nbsp;&nbsp; <input
                     name="ppp_enable" id="ppp_enable" value="1" checked="checked"
-                    type="checkbox">&nbsp;&nbsp; [57600 baud,
-                  8-bits, No parity, 1 Stop bit] 
-                </p>
+                    type="checkbox">&nbsp;&nbsp; [57600 baud, 8-bits, No parity,
+                  1 Stop bit] </p>
                 <p> Advanced <input name="wifi_advanced" id="wifi_advanced" onclick="hideShowAdvanced(this.checked)"
                     type="checkbox"> </p>
                 <p> </p>
@@ -443,6 +497,10 @@ h1{font-size:138.5%;}h2{font-size:123.1%;}h3{font-size:108%;}h1,h2,h3{margin:1em
       <div id="ft">
         <p>Accessories</p>
       </div>
+      <div id="accessories_div" class="accessories_div" style=""> <input name="accessory_data"
+          id="accessory_data" value="ACCESSORY DATA" maxlength="100" size="100"
+          type="text">. </div>
     </div>
+    
   </body>
 </html>

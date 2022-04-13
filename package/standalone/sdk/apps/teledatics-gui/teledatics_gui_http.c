@@ -32,17 +32,49 @@
 
 #include "teledatics_gui.h"
 #include "teledatics_base64_html.h"
+#include "teledatics_gui_air_quality.h"
 
 extern const char html_base64[];
 
 // global http server handle
 httpd_handle_t http_server = NULL;
 
+// global HTML buffer
+static char html_buffer[HTML_BUF_LEN];
+
+/**
+ * @brief get air quality sensor values
+ * 
+ * Get values from air quality sensor data
+ * 
+ * @param data buffer
+ * @param len of buffer
+ * @returns int length of data
+ */
+int td_get_air_quality_data(char* data, int len)
+{
+        float temp;
+        float humidity;
+        float co2;
+        float voc;
+        
+        temp = td_get_air_quality_temperature();
+        humidity = td_get_air_quality_humidity();
+        
+        td_set_absolute_humidity(temp, humidity);
+        
+        co2 = td_get_air_quality_co2();
+        voc = td_get_air_quality_voc();
+                
+        return snprintf(data, len, "temp %f C humidity %f %% co2 %f voc %f", temp, humidity, co2, voc);
+}
+
 /**
  * @brief substitute settings in HTML
  * 
  * Macro substitution of current settings
  * 
+ * @param HTML buffer
  * @param Wifi settings
  * @returns int, 0 on success
  */
@@ -124,7 +156,7 @@ int subst_wifi_values(char *html, td_wifi_config_t *tf_config)
                                 case WIFI_INTERVAL_SUBST:
                                         snprintf(val, sizeof(val)-1, "%d", tf_config->nrc_wifi_config.interval);
                                         break;
-                                case WIFI_SHORT_BCN_INTERVAL_SUBST:
+                                case WIFI_SHORT_BCN_SUBST:
                                         snprintf(val, sizeof(val)-1, "%d", tf_config->nrc_wifi_config.short_bcn_interval);
                                         break;
                                 case WIFI_TXPOWER_SUBST:
@@ -139,6 +171,9 @@ int subst_wifi_values(char *html, td_wifi_config_t *tf_config)
                                 case PPP_ENABLE_SUBST:
                                         snprintf(val, sizeof(val)-1, "%d", tf_config->ppp_enable);
                                         break;
+                                case TDXPAH_ADDON_SUBST:
+                                        snprintf(val, sizeof(val)-1, "%lld", tf_config->accessories);
+                                        break;
                                 default:
                                         break;
                         }
@@ -150,9 +185,6 @@ int subst_wifi_values(char *html, td_wifi_config_t *tf_config)
 
         return 0;
 }
-
-// global HTML buffer
-static char html_buffer[HTML_BUF_LEN];
 
 /**
  * @brief http configuration handler callback
@@ -189,6 +221,7 @@ httpd_uri_t setup_page = {
 	.uri = "/",
 	.method = HTTP_GET,
 	.handler = setup_page_http,
+        .is_websocket = false,
 	.user_ctx = NULL
 };
 
@@ -270,7 +303,7 @@ esp_err_t update_settings_handler(httpd_req_t *req)
                         }
 
                         if (httpd_query_key_value(html_buffer, "wifi_static_ip1", (char *) tmp, sizeof(tmp)) == ESP_OK) {
-                                char ipv4[32] = "";
+                                char ipv4[16] = "";
                                 
                                 strcat(ipv4, tmp);
                                 strcat(ipv4, ".");
@@ -359,7 +392,152 @@ httpd_uri_t update_settings = {
 	.uri       = "/update_settings",
 	.method    = HTTP_GET,
 	.handler   = update_settings_handler,
-	.user_ctx  = NULL
+        .is_websocket = false,
+	.user_ctx  = NULL,
+};
+
+struct async_resp_arg {
+    httpd_handle_t hd;
+    int fd;
+    td_wifi_config_t *tf_config;
+};
+
+/*
+ * async send function, which we put into the httpd work queue
+ */
+static void ws_async_send(void *arg)
+{
+        static char data[128] = "Async data";
+        struct async_resp_arg *resp_arg = arg;
+        httpd_handle_t hd = resp_arg->hd;
+        int fd = resp_arg->fd;
+        httpd_ws_frame_t ws_pkt;
+        td_wifi_config_t *tf_config = resp_arg->tf_config;
+    
+        memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    
+        if (has_air_quality_hat(tf_config)) {
+                float temp = td_get_air_quality_temperature();
+                float humidity = td_get_air_quality_humidity();
+                
+                snprintf(data, sizeof(data), "Async data temp %f humidity %f", temp, humidity);
+        }
+    
+        ws_pkt.payload = (uint8_t*)data;
+        ws_pkt.len = strlen(data);
+        ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+
+        httpd_ws_send_frame_async(hd, fd, &ws_pkt);
+        
+        free(resp_arg);
+}
+
+static esp_err_t trigger_async_send(httpd_handle_t handle, httpd_req_t *req, td_wifi_config_t *tf_config)
+{
+    struct async_resp_arg *resp_arg = malloc(sizeof(struct async_resp_arg));
+    resp_arg->hd = req->handle;
+    resp_arg->fd = httpd_req_to_sockfd(req);
+    resp_arg->tf_config = tf_config;
+    return httpd_queue_work(handle, ws_async_send, resp_arg);
+}
+
+/**
+ * @brief http update settings handler callback
+ * 
+ * Callback function that updates settings and saves to NV flash
+ * 
+ * @param http request
+ * @returns esp error type
+ */
+esp_err_t ws_handler(httpd_req_t *req)
+{
+        httpd_ws_frame_t ws_pkt;
+        uint8_t *buf=NULL;
+        esp_err_t ret;
+        td_wifi_config_t *tf_config;
+        
+        tf_config = (td_wifi_config_t *)req->user_ctx;
+                        
+        memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+        
+        nrc_usr_print ("[%s]\n", __func__);
+        
+        if (req->method == HTTP_GET) {
+                nrc_usr_print("Handshake done, new ws connection opened\n");
+                return ESP_OK;
+        }
+    
+        ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+    
+        ret = httpd_ws_recv_frame(req, &ws_pkt, 0);
+        if (ret != ESP_OK) {
+                nrc_usr_print("httpd_ws_recv_frame failed to get frame len with %d\n", ret);
+                return ret;
+        }
+        
+        nrc_usr_print("ws frame len is %d\n", ws_pkt.len);
+        
+        if (ws_pkt.len) {
+                /* ws_pkt.len + 1 is for NULL termination as we are expecting a string */
+                buf = calloc(1, ws_pkt.len + 1);
+                if (buf == NULL) {
+                        nrc_usr_print("Failed to calloc memory for buf\n");
+                        return ESP_ERR_NO_MEM;
+                }
+                
+                ws_pkt.payload = buf;
+        
+                /* Set max_len = ws_pkt.len to get the frame payload */
+                ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
+                if (ret != ESP_OK) {
+                        nrc_usr_print("httpd_ws_recv_frame failed with %d\n", ret);
+                        free(buf);
+                        return ret;
+                }
+                nrc_usr_print("Got packet with message: %s\n", ws_pkt.payload);
+        }
+    
+        nrc_usr_print("Packet type: %d\n", ws_pkt.type);
+    
+        if (ws_pkt.type == HTTPD_WS_TYPE_TEXT &&
+            strcmp((char*)ws_pkt.payload,"Trigger async") == 0) {
+                free(buf);
+                return trigger_async_send(req->handle, req, tf_config);
+        }
+        else{
+                char data[128];
+                memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    
+                if (has_air_quality_hat(tf_config)) {
+                        td_get_air_quality_data(data, sizeof(data));
+                }
+                else {
+                        snprintf(data, sizeof(data), "No accessories found!");
+                }
+    
+                ws_pkt.payload = (uint8_t*)data;
+                ws_pkt.len = strlen(data);
+                ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+
+                httpd_ws_send_frame(req, &ws_pkt);
+        }
+
+        ret = httpd_ws_send_frame(req, &ws_pkt);
+        if (ret != ESP_OK) {
+                nrc_usr_print("httpd_ws_send_frame failed with %d\n", ret);
+        }
+        
+        free(buf);
+        
+        return ret;
+}
+
+httpd_uri_t update_ws_data = {
+	.uri       = "/ws",
+	.method    = HTTP_GET,
+	.handler   = ws_handler,
+        .is_websocket = true,
+	.user_ctx  = NULL,
 };
 
 /**
@@ -385,9 +563,10 @@ httpd_handle_t run_http_server(td_wifi_config_t* tf_config)
 
         if (http_server) {
                 nrc_usr_print("[%s]: set up callbacks\n", __func__);
-                setup_page.user_ctx = update_settings.user_ctx = (void*)tf_config;
+                setup_page.user_ctx = update_settings.user_ctx = update_ws_data.user_ctx = (void*)tf_config;
 		httpd_register_uri_handler(http_server, &setup_page);
 		httpd_register_uri_handler(http_server, &update_settings);
+                httpd_register_uri_handler(http_server, &update_ws_data);
                 nrc_usr_print("[%s]: http server started\n", __func__);
                 return http_server;
 	}

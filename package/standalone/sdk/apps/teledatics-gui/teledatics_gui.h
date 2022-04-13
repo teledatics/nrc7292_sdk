@@ -105,6 +105,11 @@
 #define MAX_WIFI_INIT_TRIES 64
 #define HTML_BUF_LEN 32767
 
+#define HAVE_AIR_QUALITY_SENSOR_HAT     1
+#define HAVE_ETHERNET_HAT               2
+#define HAVE_WIFI_GW_HAT                4
+#define HAVE_ARDUCAM_SPI_CAMERA         8
+
 extern int should_quit;
 extern httpd_handle_t http_server;
 
@@ -112,6 +117,7 @@ typedef struct {
         uint8_t wifi_mode;
         uint8_t ppp_enable;
         char ipv6_addr[255];
+        uint64_t accessories;
         WIFI_CONFIG nrc_wifi_config;
 } td_wifi_config_t;
 
@@ -137,6 +143,12 @@ void stop_http_server(void);
 
 int td_start_ppp(void);
 int td_stop_ppp(void);
+
+#define has_air_quality_hat(x)  (x && (x->accessories &  HAVE_AIR_QUALITY_SENSOR_HAT) ? 1 : 0)
+#define has_ethernet_hat(x)  (x && (x->accessories &  HAVE_ETHERNET_HAT) ? 1 : 0)
+#define has_wifi_gw_hat(x)  (x && (x->accessories &  HAVE_WIFI_GW_HAT) ? 1 : 0)
+#define has_arducam_camera(x)  (x && (x->accessories &  HAVE_ARDUCAM_SPI_CAMERA) ? 1 : 0)
+nrc_err_t td_init_accessories(td_wifi_config_t* tf_config);
 
 void restart_system(void);
 char * subst_string(char* dest, char *old, const char *new);

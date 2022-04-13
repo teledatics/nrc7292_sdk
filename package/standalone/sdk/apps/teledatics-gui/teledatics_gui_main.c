@@ -340,6 +340,8 @@ nrc_err_t td_init(td_wifi_config_t *tf_config)
 
         if(td_get_wifi_config(tf_config) != NRC_SUCCESS)
                 goto failed;
+        
+        td_init_accessories(tf_config);
 
         return NRC_SUCCESS;
 

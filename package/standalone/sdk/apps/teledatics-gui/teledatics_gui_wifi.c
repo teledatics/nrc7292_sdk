@@ -33,6 +33,10 @@
  #include "teledatics_gui.h"
  
 #include "lwip/netif.h"
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+#include "nrc_eth_if.h"
+#endif
+
 extern struct netif* nrc_netif[];
 
 static void td_wifi_event_handler(tWIFI_EVENT_ID event, int data_len, char* data)
@@ -47,7 +51,11 @@ static void td_wifi_event_handler(tWIFI_EVENT_ID event, int data_len, char* data
 			if (!netif_is_link_up(nrc_netif[0])) {
 				netif_set_link_up(nrc_netif[0]);
 			}
-
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+			if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+				break;
+			}
+#endif
 			do {
 				ret = nrc_wifi_set_ip_address();
 				if(ret != WIFI_SUCCESS) {
@@ -187,6 +195,13 @@ int td_wifi_connect(td_wifi_config_t* tf_config)
 	}
 
 	if (nrc_wifi_set_ip_address() != WIFI_SUCCESS) {
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+	/* Do not set ip on bridge interface */
+	/* TODO: incomplete. Should be fixed if bridge needs IP */
+	if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+		return WIFI_SUCCESS;
+	}
+#endif
 		nrc_usr_print("[%s] Fail to set IP Address\n", __func__);
 		return WIFI_SET_IP_FAIL;
 	}

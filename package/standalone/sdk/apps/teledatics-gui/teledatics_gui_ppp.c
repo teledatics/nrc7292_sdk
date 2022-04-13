@@ -53,8 +53,8 @@ static sio_fd_t ppp_sio;
 static ppp_pcb *ppp;
 static struct netif pppos_netif;
 
-#define PPP_UART NRC_UART_CH0
-#define PPP_UART_BASE HSUART0_BASE_ADDR
+#define PPP_UART NRC_UART_CH2
+#define PPP_UART_BASE HSUART2_BASE_ADDR
 #define PPP_BAUD_RATE 57600
 
 static NRC_UART_CONFIG sio_uart_dev;
@@ -406,6 +406,9 @@ void ppp_uart_isr(int vector)
         while(nrc_uart_get(sio_uart_dev.ch, &recv_char) == NRC_SUCCESS)
         {
                 xQueueSendToBackFromISR( ppp_recv_queue, &recv_char, &xHigherPriorityTaskWoken );
+                
+                 if(uart_busy())
+                         break;
         }
 }
 

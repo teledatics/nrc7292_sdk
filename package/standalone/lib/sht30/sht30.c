@@ -86,7 +86,8 @@ static int sht30_read_data(struct sht30_dev *dev, uint8_t* data, uint8_t len)
                 return SHT30_E_NULL_PTR;
         
         if(!len)
-         
+                return SHT30_E_INVALID_LENGTH;
+        
         rslt = dev->read(dev->chip_id, data, len);
         
         if(rslt)
@@ -111,7 +112,7 @@ int8_t sht30_init(struct sht30_dev *dev)
         if(!dev)
                 return SHT30_E_NULL_PTR;
         
-        /* Soft reset to restore it to default values*/
+        /* Soft reset */
         rslt = sht30_soft_reset(dev);
         
         if (rslt == SHT30_OK) {
@@ -144,9 +145,9 @@ int8_t sht30_get_status(struct sht30_dev *dev)
         rslt = sht30_send_cmd(dev, SHT30_READ_STATUS_CMD);
 
         if(rslt == SHT30_OK) {
-                rslt = dev->read(dev->chip_id, data, sizeof(data));
+                rslt = sht30_read_data(dev, data, sizeof(data));
                 
-                if(rslt)
+                if(rslt != SHT30_OK)
                         return SHT30_E_COM_FAIL;
 
                 dev->status = (uint16_t)(data[0] << 8 | data[1]) ;
@@ -199,6 +200,7 @@ int8_t sht30_soft_reset(struct sht30_dev *dev)
  *
  * @return Result of CRC8 calculation
  */
+#ifndef SGP30_LOOKUP_TABLE
 static uint8_t crc8(const uint8_t *data, int len) 
 {
         const uint8_t polynomial=0x31;
@@ -214,6 +216,19 @@ static uint8_t crc8(const uint8_t *data, int len)
         
         return crc;
 }
+#else
+static uint8_t crc8(const uint8_t *data, int len)
+{
+  uint8_t crc = 0xFF;
+  
+  crc ^= (uint8_t)(data >> 8);
+  crc = crc8_lookup_tbl[crc >> 4][crc & 0xF];
+  crc ^= (uint8_t)data;
+  crc = crc8_lookup_tbl[crc >> 4][crc & 0xF];
+  
+  return crc;
+}
+#endif /* SGP30_LOOKUP_TABLE */
 
 /*!
  * @brief This API reads temperature and humidity
@@ -242,7 +257,10 @@ int8_t sht30_get_sensor_data(struct sht30_dev *dev)
                 return rslt;
         }
         
-        dev->read(dev->chip_id, data, sizeof(data));
+        rslt = sht30_read_data(dev, data, sizeof(data));
+        
+        if(rslt != SHT30_OK)
+                return rslt;
         
         if (data[2] != crc8(data, 2) ||
             data[5] != crc8(data + 3, 2)) {

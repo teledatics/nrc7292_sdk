@@ -24,14 +24,14 @@
  */
 
  /**
- * @file sht30_defs.h
+ * @file sgp30_defs.h
  * @author James Ewing
- * @date 7 Apr 2022
- * @brief Teledatics I2C sht30 Gas Sensor Library
+ * @date 11 Apr 2022
+ * @brief Teledatics I2C sgp30 Gas Sensor Library
  */
  
-#ifndef SHT30_DEFS_H_
-#define SHT30_DEFS_H_
+#ifndef SGP30_DEFS_H_
+#define SGP30_DEFS_H_
 
 /********************************************************/
 /* header includes */
@@ -100,48 +100,42 @@
 #endif
 #endif
 
-/** SHT30 configuration macros */
-#define SHT30_MEAS_HIGHREP_STRETCH	UINT16_C(0x2C06) /* Measurement High Repeatability with Clock Stretch Enabled */
-#define SHT30_MEAS_MEDREP_STRETCH 	UINT16_C(0x2C0D) /* Measurement Medium Repeatability with Clock Stretch Enabled */
-#define SHT30_MEAS_LOWREP_STRETCH 	UINT16_C(0x2C10) /* Measurement Low Repeatability with Clock Stretch Enabled*/
-#define SHT30_MEAS_HIGHREP 		UINT16_C(0x2400) /* Measurement High Repeatability with Clock Stretch Disabled */
-#define SHT30_MEAS_MEDREP 		UINT16_C(0x240B) /* Measurement Medium Repeatability with Clock Stretch Disabled */
-#define SHT30_MEAS_LOWREP 		UINT16_C(0x2416) /* Measurement Low Repeatability with Clock Stretch Disabled */
-
-#define SHT30_POLL_ART_4MHZ	UINT16_C(0x2B32)
-#define SHT30_POLL_STOP		UINT16_C(0x3093)
-
-/** SHT30 unique chip identifier */
-#define SHT30_CHIP_ID_PRIMARY	UINT8_C(0x44)
-#define SHT30_CHIP_ID_SECONDARY	UINT8_C(0x45)
+/** SGP30 configuration macros */
+#define SGP30_IAQ_INIT				UINT16_C(0X2003)
+#define SGP30_MEASURE_IAQ 			UINT16_C(0x2008)
+#define SGP30_GET_IAQ_BASELINE 			UINT16_C(0x2015)
+#define SGP30_SET_IAQ_BASELINE 			UINT16_C(0X201E)
+#define SGP30_SET_ABSOLUTE_HUMIDITY 		UINT16_C(0x2061)
+#define SGP30_MEASURE_TEST 			UINT16_C(0x2032)
+#define SGP30_GET_FEATURE_SET 			UINT16_C(0X202F)
+#define SGP30_MEASURE_RAW 			UINT16_C(0x2050)
+#define SGP30_GET_TVOC_INCEPTIVE_BASELINE 	UINT16_C(0X20B3)
+#define SGP30_SET_TVOC_BASELINE 		UINT16_C(0x2077)
 
 /** Soft reset command */
-#define SHT30_SOFT_RESET_CMD   UINT16_C(0x30A2)
+#define SGP30_SOFT_RESET_CMD   			UINT16_C(0x0006)
 
-/** Read status command */
-#define SHT30_READ_STATUS_CMD   UINT16_C(0xF32D)
+/** Get serial ID command */
+#define SGP30_SERIAL_ID_CMD   			UINT16_C(0x3682)
 
-/** Clear status command */
-#define SHT30_CLEAR_STATUS_CMD	UINT16_C(0x3041)
-
-/** Heater enable command */
-#define SHT30_HEATER_ON_CMD	UINT16_C(0x306D)
-
-/** Heater disable command */
-#define SHT30_HEATER_OFF_CMD	UINT16_C(0x3066)
-
-#define SHT31_REG_HEATER_BIT 	UINT8_C(0x0d)
+/** SGP30 unique chip identifier */
+#define SGP30_CHIP_ID_PRIMARY			UINT8_C(0x58)
 
 /** Error code definitions */
-#define SHT30_OK		INT8_C(0)
+#define SGP30_OK				INT8_C(0)
 
 /* Errors */
-#define SHT30_E_NULL_PTR		INT8_C(-1)
-#define SHT30_E_COM_FAIL		INT8_C(-2)
-#define SHT30_E_DEV_NOT_FOUND		INT8_C(-3)
-#define SHT30_E_INVALID_LENGTH		INT8_C(-4)
+#define SGP30_E_NULL_PTR		INT8_C(-1)
+#define SGP30_E_COM_FAIL		INT8_C(-2)
+#define SGP30_E_DEV_NOT_FOUND		INT8_C(-3)
+#define SGP30_E_INVALID_LENGTH		INT8_C(-4)
+#define SGP30_E_SELF_TEST_FAIL		INT8_C(-5)
 
-#define SHT30_DELAY_MS 20
+#define SGP30_SELF_TEST_REF		UINT16_C(0xD400)
+
+#define SGP30_SELF_TEST_DELAY		220
+
+#define SGP30_DELAY_MS 			20
 
 #define UNKNOWN_VALUE NAN
 
@@ -151,44 +145,52 @@
  * @param[in/out] reg_data: Data array to read/write
  * @param[in] len: Length of the data array
  */
-typedef int8_t (*sht30_com_fptr_t)(uint8_t chip_id, uint8_t *data, uint16_t len);
+typedef int8_t (*sgp30_com_fptr_t)(uint8_t chip_id, uint8_t *data, uint16_t len);
 
 /*!
  * Delay function pointer
  * @param[in] period: Time period in milliseconds
  */
-typedef void (*sht30_delay_fptr_t)(uint32_t period);
+typedef void (*sgp30_delay_fptr_t)(uint32_t period);
 
 /*!
- * @brief SHT30 device structure
+ * @brief SGP30 device structure
  */
-struct	sht30_dev {
+struct	sgp30_dev {
 	
 	/*! Chip Id */
 	uint8_t chip_id;
 	
-	/*! Status new_data */
-	uint64_t status;
+	/*! Serial ID */
+	uint64_t serial_id;
 	
-	/*! Status new_data */
-	uint8_t heater;
+	/* feature set */
+	uint16_t features;
 	
-	/*! Temperature in degree celsius x100 */
-	int32_t temperature;
+	/*! H2 test value */
+	uint16_t h2;
 	
-	/*! Humidity */
-	uint32_t humidity;
+	/*! Ethanol test value */
+	uint16_t ethanol;
+	
+	/*! CO2 concentration */
+	uint16_t co2;
+	uint16_t co2_baseline;
+	
+	/*! VOC concentration */
+	uint16_t voc;
+	uint16_t voc_baseline;
 	
 	/*! Bus read function pointer */
-	sht30_com_fptr_t read;
+	sgp30_com_fptr_t read;
 	
 	/*! Bus write function pointer */
-	sht30_com_fptr_t write;
+	sgp30_com_fptr_t write;
 	
 	/*! delay function pointer */
-	sht30_delay_fptr_t delay_ms;
+	sgp30_delay_fptr_t delay_ms;
 
 };
 
-#endif /* SHT30_DEFS_H_ */
+#endif /* SGP30_DEFS_H_ */
 /** @}*/

@@ -1,4 +1,6 @@
 CSRCS += \
+	teledatics_gui_accessories.c \
+	teledatics_gui_air_quality.c \
 	teledatics_gui_http.c \
 	teledatics_gui_main.c \
 	teledatics_gui_ppp.c \
