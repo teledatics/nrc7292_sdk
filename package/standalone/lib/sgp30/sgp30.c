@@ -482,8 +482,8 @@ int8_t sgp30_get_sensor_raw_data(struct sgp30_dev *dev)
         if(rslt != SGP30_OK)
                 return rslt;
         
-        if (data[2] != crc8(data, 2) ||
-            data[5] != crc8(data + 3, 2)) {
+        if (data[2] != crc8(&data[0], 2) ||
+            data[5] != crc8(&data[3], 2)) {
                 return SGP30_E_COM_FAIL;
         }
 
@@ -523,10 +523,10 @@ int8_t sgp30_set_sensor_baseline(struct sgp30_dev *dev)
         
         data[0] = (uint8_t)dev->co2_baseline >> 8;
         data[1] = (uint8_t)dev->co2_baseline & 0xFF;
-        data[2] = crc8(data, 2);
+        data[2] = crc8(&data[0], 2);
         data[3] = (uint8_t)dev->voc_baseline >> 8;
         data[4] = (uint8_t)dev->voc_baseline & 0xFF;
-        data[5] = crc8(data+3, 2);
+        data[5] = crc8(&data[3], 2);
         
         rslt = sgp30_write_data(dev, data, sizeof(data));
         
@@ -581,8 +581,8 @@ float sgp30_get_voc(struct sgp30_dev *dev)
 }
 
 /*!
- * @brief This API reads CO2 and VOC
- * from the sensor, compensates the data and store it in the sgp30_data
+ * @brief This API sets the absolute humidity value 
+ * on the sensor, compensates the data and store it in the sgp30_data
  * structure instance passed by the user.
  *
  * taken from https://carnotcycle.wordpress.com/2012/08/04/how-to-convert-relative-humidity-to-absolute-humidity/
@@ -607,7 +607,7 @@ int8_t sgp30_set_absolute_humidity(struct sgp30_dev *dev, float temperature, flo
         float temp;
         float ah;
         uint16_t ah_scaled;
-        uint8_t cmd[3];
+        uint8_t ah_data[3];
 
         if(!dev)
                 return SGP30_E_NULL_PTR;
@@ -626,11 +626,11 @@ int8_t sgp30_set_absolute_humidity(struct sgp30_dev *dev, float temperature, flo
                 return rslt;
         }
 
-        cmd[0] = ah_scaled >> 8;
-        cmd[1] = ah_scaled & 0xFF;
-        cmd[2] = crc8(cmd, 2);
+        ah_data[0] = ah_scaled >> 8;
+        ah_data[1] = ah_scaled & 0xFF;
+        ah_data[2] = crc8(&ah_data[0], 2);
         
-        rslt = sgp30_write_data(dev, cmd, sizeof(cmd));
+        rslt = sgp30_write_data(dev, ah_data, sizeof(ah_data));
         
         if(rslt != SGP30_OK) {
                 return SGP30_E_COM_FAIL;

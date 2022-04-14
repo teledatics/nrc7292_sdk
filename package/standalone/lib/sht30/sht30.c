@@ -200,7 +200,7 @@ int8_t sht30_soft_reset(struct sht30_dev *dev)
  *
  * @return Result of CRC8 calculation
  */
-#ifndef SGP30_LOOKUP_TABLE
+#ifndef SHT30_LOOKUP_TABLE
 static uint8_t crc8(const uint8_t *data, int len) 
 {
         const uint8_t polynomial=0x31;
@@ -228,7 +228,7 @@ static uint8_t crc8(const uint8_t *data, int len)
   
   return crc;
 }
-#endif /* SGP30_LOOKUP_TABLE */
+#endif /* SHT30_LOOKUP_TABLE */
 
 /*!
  * @brief This API reads temperature and humidity
@@ -262,8 +262,8 @@ int8_t sht30_get_sensor_data(struct sht30_dev *dev)
         if(rslt != SHT30_OK)
                 return rslt;
         
-        if (data[2] != crc8(data, 2) ||
-            data[5] != crc8(data + 3, 2)) {
+        if (data[2] != crc8(&data[0], 2) ||
+            data[5] != crc8(&data[3], 2)) {
                 return SHT30_E_COM_FAIL;
         }
 
