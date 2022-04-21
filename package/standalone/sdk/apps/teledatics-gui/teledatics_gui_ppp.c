@@ -55,7 +55,7 @@ static struct netif pppos_netif;
 
 #define PPP_UART NRC_UART_CH2
 #define PPP_UART_BASE HSUART2_BASE_ADDR
-#define PPP_BAUD_RATE 57600
+#define PPP_BAUD_RATE 115200
 
 static NRC_UART_CONFIG sio_uart_dev;
 static QueueHandle_t ppp_recv_queue;

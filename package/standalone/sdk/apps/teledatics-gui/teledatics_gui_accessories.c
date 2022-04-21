@@ -32,6 +32,7 @@
 
 #include "teledatics_gui.h"
 #include "teledatics_gui_air_quality.h"
+#include "nrc_eth_if.h"
  
 /**
  * @brief Identify attached accessories
@@ -54,6 +55,11 @@ nrc_err_t td_init_accessories(td_wifi_config_t* tf_config)
                 nrc_usr_print ("[%s] found air quality sensor\n", __func__);
                 tf_config->accessories |= HAVE_AIR_QUALITY_SENSOR_HAT;
         }
+//         else if(td_init_ethernet_hat() == NRC_SUCCESS) {
+// #ifdef SUPPORT_ETHERNET_ACCESSPOINT
+//                 ethernet_init(NULL);
+// #endif
+//         }
         
         return NRC_SUCCESS;
 }

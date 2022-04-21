@@ -32,9 +32,8 @@
 
 #include "teledatics_gui.h"
 #include "teledatics_base64_html.h"
+#include "teledatics_base64_chartist_js.h"
 #include "teledatics_gui_air_quality.h"
-
-extern const char html_base64[];
 
 // global http server handle
 httpd_handle_t http_server = NULL;
@@ -540,6 +539,85 @@ httpd_uri_t update_ws_data = {
 	.user_ctx  = NULL,
 };
 
+
+/**
+ * @brief http send gzip'd charts.js pkg
+ * 
+ * Callback function that sends charts.js gzip data
+ * 
+ * @param http request
+ * @returns esp error type
+ */
+esp_err_t chartist_js_gzip_handler(httpd_req_t *req)
+{
+        td_wifi_config_t *tf_config;
+        size_t html_len;
+        int ret;
+
+        memset(html_buffer, 0, sizeof(html_buffer));
+
+        ret = mbedtls_base64_decode((uint8_t*)html_buffer, sizeof(html_buffer), &html_len, 
+                                    (uint8_t*)chartist_js_gz_base64, strlen(chartist_js_gz_base64));
+        if(ret || html_len <= 0) {
+                nrc_usr_print("[%s]: base64 decode error ret %d html_len %d\n", __func__, ret, html_len);
+                return ESP_ERR_HTTPD_INVALID_REQ;
+        }
+
+        httpd_resp_set_type(req, "text/javascript");
+        httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+
+        nrc_usr_print("[%s]: send %d bytes\n", __func__, html_len);
+        
+        return httpd_resp_send(req, html_buffer, strlen(html_buffer));
+}
+
+httpd_uri_t send_charts_js_gzipped_data = {
+	.uri       = "/chartist.js",
+	.method    = HTTP_GET,
+	.handler   = chartist_js_gzip_handler,
+        .is_websocket = false,
+	.user_ctx  = NULL,
+};
+
+/**
+ * @brief http send gzip'd charts.css pkg
+ * 
+ * Callback function that sends charts.css gzip data
+ * 
+ * @param http request
+ * @returns esp error type
+ */
+esp_err_t chartist_css_gzip_handler(httpd_req_t *req)
+{
+        td_wifi_config_t *tf_config;
+        size_t html_len;
+        int ret;
+
+        memset(html_buffer, 0, sizeof(html_buffer));
+
+        ret = mbedtls_base64_decode((uint8_t*)html_buffer, sizeof(html_buffer), &html_len, 
+                                    (uint8_t*)chartist_css_gz_base64, strlen(chartist_css_gz_base64));
+        if(ret || html_len <= 0) {
+                nrc_usr_print("[%s]: base64 decode error ret %d html_len %d\n", __func__, ret, html_len);
+                return ESP_ERR_HTTPD_INVALID_REQ;
+        }
+
+        httpd_resp_set_type(req, "text/css");
+        httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+        
+        nrc_usr_print("[%s]: send %d bytes\n", __func__, html_len);
+
+        return httpd_resp_send(req, html_buffer, strlen(html_buffer));
+}
+
+httpd_uri_t send_charts_css_gzipped_data = {
+	.uri       = "/chartist.css",
+	.method    = HTTP_GET,
+	.handler   = chartist_css_gzip_handler,
+        .is_websocket = false,
+	.user_ctx  = NULL,
+};
+
 /**
  * @brief start http server
  * 
@@ -567,6 +645,8 @@ httpd_handle_t run_http_server(td_wifi_config_t* tf_config)
 		httpd_register_uri_handler(http_server, &setup_page);
 		httpd_register_uri_handler(http_server, &update_settings);
                 httpd_register_uri_handler(http_server, &update_ws_data);
+                httpd_register_uri_handler(http_server, &send_charts_js_gzipped_data);
+                httpd_register_uri_handler(http_server, &send_charts_css_gzipped_data);
                 nrc_usr_print("[%s]: http server started\n", __func__);
                 return http_server;
 	}

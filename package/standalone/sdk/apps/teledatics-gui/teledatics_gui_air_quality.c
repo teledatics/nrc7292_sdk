@@ -228,7 +228,7 @@ float td_get_air_quality_voc(void)
 
 #ifdef SUPPORT_SGP30
 /**
- * @brief Set relative humidty in air quality sensor hAT
+ * @brief Set absolute humidty in air quality sensor hAT
  * 
  * Set absolute humidity from temp, humidity air quality hAT
  * 

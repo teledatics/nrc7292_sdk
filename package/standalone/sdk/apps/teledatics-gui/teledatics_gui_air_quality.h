@@ -33,9 +33,6 @@
 #ifndef TELEDATICS_AIR_QUALITY_H
 #define TELEDATICS_AIR_QUALITY_H
 
-#define SUPPORT_SHT30 1
-// #define SUPPORT_SGP30 1
-
 #define SENSOR_I2C_SCL             16
 #define SENSOR_I2C_SDA             17
 #define SENSOR_I2C_CLOCK           100000
