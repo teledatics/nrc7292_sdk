@@ -207,9 +207,9 @@ static void wifi_ifconfig_display_all()
 	if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 		br_ifconfig_display( );
 		A("\n");
+		eth_ifconfig_display( );
+		A("\n");
 	}
-	eth_ifconfig_display( );
-	A("\n");
 #endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 	for(i = 0; i < MAX_IF; i++) {
 		wifi_ifconfig_display(i);
@@ -241,10 +241,10 @@ bool wifi_ifconfig(int num_param, char *params[])
 		if_idx = 1;
 		nif = nrc_netif[if_idx];
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
-	} else if (strcmp(if_name, "eth") == 0) {
+	} else if (strcmp(if_name, "eth") == 0 && get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 		if_idx = 2;
 		nif = &eth_netif;
-	} else if (strcmp(if_name, "br") == 0) {
+	} else if (strcmp(if_name, "br") == 0 && get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 		if_idx = 3;
 		nif = &br_netif;
 #endif /* SUPPORT_ETHERNET_ACCESSPOINT */
@@ -277,9 +277,9 @@ bool wifi_ifconfig(int num_param, char *params[])
 	if ((if_idx == 0) || (if_idx == 1)) {
 		wifi_ifconfig_display(if_idx);
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
-	} else if (if_idx == 2) {
+	} else if (if_idx == 2 && get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 		eth_ifconfig_display();
-	} else if (if_idx == 3) {
+	} else if (if_idx == 3 && get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 		br_ifconfig_display();
 #endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 	}
@@ -414,6 +414,7 @@ int aes_sample_test(void)
 
 int setup_wifi_ap_mode(int vif, int updated_lease_time)
 {
+return 0;	
 	A("%s vif:%d :%d min\n", __func__, vif, updated_lease_time);
 
 	wifi_set_opmode((wifi_get_opmode()|WIFI_STATIONAP_MODE)&USE_WIFI_MODE);
@@ -453,6 +454,10 @@ int start_dhcps_on_if(struct netif *net_if, int updated_lease_time)
 	int vif = 0;
 	struct ip_info ipinfo;
 
+	if (get_network_mode() != NRC_NETWORK_MODE_BRIDGE) {
+		return 0;
+	}
+	
 	vif = net_if->num;
 	A("%s netif name : %c%c%d\n", __func__, net_if->name[0], net_if->name[1], net_if->num);
 	A("%s vif:%d :%d min\n", __func__, vif, updated_lease_time);
@@ -555,6 +560,11 @@ static void lwip_handle_interfaces(void * param)
 	/* bring it up */
 		netif_set_up( nrc_netif[i] );
 	}
+
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+// 	ethernet_init(NULL);
+#endif
+	
 }
 
 /* Initialisation required by lwIP. */

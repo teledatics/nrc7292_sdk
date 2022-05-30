@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -23,26 +23,29 @@
  *
  */
 
- /**
+/**
  * @file teledatics_gui_air_quality.h
  * @author James Ewing
  * @date 8 Apr 2022
  * @brief Teledatics Air Quality hAT utilities for Halo TD-XPAH
  */
 
+#include "teledatics_gui.h"
+
 #ifndef TELEDATICS_AIR_QUALITY_H
 #define TELEDATICS_AIR_QUALITY_H
 
-#define SENSOR_I2C_SCL             16
-#define SENSOR_I2C_SDA             17
-#define SENSOR_I2C_CLOCK           100000
-#define SENSOR_I2C_CLOCK_SOURCE    0 /* 0:clock controller, 1:PCLK */
-#define I2C_XACT_DELAY_MS       1
+#define SENSOR_I2C_SCL 16
+#define SENSOR_I2C_SDA 17
+#define SENSOR_I2C_CLOCK 100000
+#define SENSOR_I2C_CLOCK_SOURCE 0 /* 0:clock controller, 1:PCLK */
+#define I2C_XACT_DELAY_MS 1
 
-#define SENSOR_OK           0
-#define SENSOR_FAIL        -1
+#define SENSOR_OK 0
+#define SENSOR_FAIL -1
 
 nrc_err_t td_init_air_quality_hat(void);
+nrc_err_t td_shutdown_air_quality_hat(void);
 float td_get_air_quality_temperature(void);
 float td_get_air_quality_humidity(void);
 float td_get_air_quality_co2(void);

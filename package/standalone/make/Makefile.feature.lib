@@ -269,6 +269,7 @@ ifeq ($(CONFIG_ETHERNET), y)
     VPATH   += $(ETH_BASE)
 
     include $(ETH_BASE)/ethernet.make
+    DEFINE	+= -DSUPPORT_ETHERNET_ACCESSPOINT
 endif
 
 #// --------------------------------------------------
@@ -277,7 +278,7 @@ endif
 #// --------------------------------------------------
 ETH_ENC28J60_BASE    = $(LIB_PATH)/eth_enc28j60
 
-INCLUDE += -I$(ETH_ENC28J60_BASE)
+INCLUDE += -I$(ETH_ENC28J60_BASE) -I$(LWIP_PORT)
 
 ifeq ($(CONFIG_ETH_ENC28J60), y)
     VPATH   += $(ETH_ENC28J60_BASE)

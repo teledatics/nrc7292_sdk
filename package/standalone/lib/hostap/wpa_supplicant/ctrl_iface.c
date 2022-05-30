@@ -12,6 +12,8 @@
 #endif /* CONFIG_TESTING_OPTIONS */
 #ifndef _FREERTOS
 #include <net/ethernet.h>
+#else
+#include "driver_nrc.h"
 #endif
 #include "utils/common.h"
 #include "utils/eloop.h"

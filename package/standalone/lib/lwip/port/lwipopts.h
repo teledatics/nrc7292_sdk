@@ -52,7 +52,6 @@
 #define LWIP_IGMP 0
 #define LWIP_ICMP 1
 
-
 #define LWIP_NETIF_STATUS_CALLBACK  1
 #define LWIP_NETIF_LINK_CALLBACK    1
 
@@ -105,6 +104,9 @@
 #define TCP_QLEN_DEBUG             LWIP_DBG_OFF
 #define TCP_RST_DEBUG              LWIP_DBG_OFF
 #define ETHARP_DEBUG               LWIP_DBG_OFF
+#define BRIDGEIF_DEBUG             LWIP_DBG_OFF
+#define BRIDGEIF_FDB_DEBUG         LWIP_DBG_OFF
+#define BRIDGEIF_FW_DEBUG          LWIP_DBG_OFF
 #endif
 
 #define LWIP_DBG_TYPES_ON (LWIP_DBG_ON|LWIP_DBG_TRACE|\
@@ -128,6 +130,12 @@ this.
  */
 #define LWIP_TCPIP_CORE_LOCKING         1
 
+#if LWIP_TCPIP_CORE_LOCKING
+#define LWIP_NETCONN_SEM_PER_THREAD     0
+#else
+#define LWIP_NETCONN_SEM_PER_THREAD     1
+#endif /* LWIP_TCPIP_CORE_LOCKING */
+
 #define LWIP_STATS_DISPLAY              1
 #define LWIP_TIMERS                     1
 
@@ -139,7 +147,7 @@ this.
  * ATTENTION: this does not work when tcpip_input() is called from
  * interrupt context!
  */
-#define LWIP_TCPIP_CORE_LOCKING_INPUT   1
+#define LWIP_TCPIP_CORE_LOCKING_INPUT   0
 
 /* ---------- Memory options ---------- */
 /* MEM_ALIGNMENT: should be set to the alignment of the CPU for which
@@ -231,7 +239,7 @@ a lot of data that needs to be copied, this should be set high. */
 #if defined(TS8266) || defined(TR6260) || defined(NRC7392)
 #define PBUF_POOL_SIZE          5
 #else
-#define PBUF_POOL_SIZE          12
+#define PBUF_POOL_SIZE          40
 #endif
 
 /* PBUF_POOL_BUFSIZE: the size of each pbuf in the pbuf pool. */
@@ -239,7 +247,7 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* PBUF_LINK_HLEN: the number of bytes that should be allocated for a
    link level header. */
-#define PBUF_LINK_HLEN          16
+#define PBUF_LINK_HLEN          24
 
 /* ---------- TCP options ---------- */
 #define LWIP_TCP                1
@@ -284,9 +292,9 @@ a lot of data that needs to be copied, this should be set high. */
 
 
 /* ---------- ARP options ---------- */
-#define LWIP_ARP		1
-#define ARP_TABLE_SIZE 10
-#define ETHARP_TABLE_MATCH_NETIF        1
+#define LWIP_ARP		        1
+#define ARP_TABLE_SIZE                 20
+#define ETHARP_TABLE_MATCH_NETIF        0
 #define ARP_QUEUEING                    1
 
 /* ---------- IP options ---------- */
@@ -326,7 +334,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define UDP_TTL                 255
 
 /* ---------- Statistics options ---------- */
-//#define STATS
+// #define STATS
 
 #ifdef STATS
 #define LINK_STATS 1

@@ -47,7 +47,16 @@ struct nrc_wpa;
 #define ETH_P_AARP			(0x80F3)
 #define ETH_P_IPX			(0x8137)
 #define ETH_P_802_3_MIN		(0x0600)
+#define ETH_P_802_3       0x0001          /* Dummy type for 802.3 frames  */
 #define HLEN_8023	(sizeof(struct ieee8023_hdr))
+
+/* 10Mb/s ethernet header */
+struct ether_header
+{
+  uint8_t  ether_dhost[ETH_ALEN];	/* destination eth addr	*/
+  uint8_t  ether_shost[ETH_ALEN];	/* source ether addr	*/
+  uint16_t ether_type;		        /* packet type ID field	*/
+} __attribute__ ((__packed__));
 
 #define WLAN_BA_ADDBA_REQUEST		0	/* ADDBA request */
 #define WLAN_BA_ADDBA_RESPONSE		1	/* ADDBA response */

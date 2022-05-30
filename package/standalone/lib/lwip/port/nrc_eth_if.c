@@ -12,13 +12,15 @@
 
 #include "nrc_wifi.h"
 #include "driver_nrc.h"
+
+#include "eth.h"
+
 #ifdef ETH_DRIVER_ENC28J60
 #include "enc28j60.h"
 #endif
 #ifdef ETH_DRIVER_W5500
 #include "w5500.h"
 #endif
-#include "eth.h"
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
@@ -59,7 +61,7 @@ static err_t nrc_eth_output( struct netif *netif, struct pbuf *p )
 {
 	struct pbuf *q;
 	err_t xReturn = ERR_OK;
-	uint8_t buffer[ETH_MAX_PACKET_SIZE];
+	static uint8_t buffer[ETH_MAX_PACKET_SIZE];
 	uint32_t length = 0;
 
 	for( q = p; q != NULL; q = q->next )
@@ -67,9 +69,6 @@ static err_t nrc_eth_output( struct netif *netif, struct pbuf *p )
 		memcpy(buffer + length, q->payload, q->len);
 		length += q->len;
 	}
-
-	V(TT_NET, "[%s] transmitting length = %d...\n", __func__, length);
-//	print_buffer(buffer, length);
 
 	nrc_eth_mac->transmit(nrc_eth_mac, buffer, length);
 
@@ -128,22 +127,22 @@ static void status_callback(struct netif *eth_if)
 
 	if (netif_is_up(eth_if)) {
 		if (!ip4_addr_isany_val(*netif_ip4_addr(target_if))) {
-			I(TT_NET, "[%s] netif_is_up, local interface IP is %s\n",
+			nrc_usr_print("[%s] netif_is_up, local interface IP is %s\n",
 					  __func__,
 					  ip4addr_ntoa(netif_ip4_addr(target_if)));
-			I(TT_NET, "[%s] IP is ready\n", __func__);
+			nrc_usr_print("[%s] IP is ready\n", __func__);
 		}
 	} else {
-		I(TT_NET, "[%s] netif_is_down\n", __func__);
+		nrc_usr_print("[%s] netif_is_down\n", __func__);
 	}
 }
 
 static void link_callback(struct netif *eth_if)
 {
 	if (netif_is_link_up(eth_if)) {
-		I(TT_NET, "[%s] UP\n", __func__);
+		nrc_usr_print("[%s] UP\n", __func__);
 	} else {
-	    I(TT_NET, "[%s] DOWN\n", __func__);
+		nrc_usr_print("[%s] DOWN\n", __func__);
 	}
 }
 
@@ -165,9 +164,9 @@ static void nrc_bind_eth_if(esp_eth_mac_t *mac)
     netif_add(&eth_netif, &ipaddr, &netmask, &gw, NULL, eth_init, ethernet_input);
     netif_set_status_callback(&eth_netif, status_callback);
     netif_set_link_callback(&eth_netif, link_callback);
-
-
-	netif_set_flags(&eth_netif, NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET);
+    
+    netif_set_flags(&eth_netif, NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET);
+    
     /* bring it up */
     netif_set_up(&eth_netif);
 
@@ -182,8 +181,12 @@ static void nrc_bind_eth_if(esp_eth_mac_t *mac)
 		bridge_data.max_fdb_static_entries = 16;
 
 		netif_add(&br_netif, &ipaddr, &netmask, &gw, &bridge_data, bridgeif_init, ethernet_input);
+		
 		bridgeif_add_port(&br_netif, &eth_netif);
+
 		bridgeif_add_port(&br_netif, nrc_netif[0]);
+		
+		bridgeif_add_port(&br_netif, nrc_netif[1]);
 
 		bridgeif_fdb_add(&br_netif, &ethbroadcast, BR_FLOOD);
 		netif_set_default(&br_netif);
@@ -228,20 +231,20 @@ static nrc_err_t eth_stack_input_handler(esp_eth_handle_t eth_handle, uint8_t *b
 
 	if (eth_mode == NRC_ETH_MODE_AP) {
 		if (intf) {
-			V(TT_NET, "[%s] nrc_wpa_if found...\n", __func__);
+// 			nrc_usr_print("[%s] nrc_wpa_if found...\n", __func__);
 			if (intf->is_ap) {
 				sta = nrc_wpa_find_sta(intf, ethhdr->dest.addr);
 				if (sta) {
-					V(TT_NET, "[%s] station found ...\n", __func__);
+// 					nrc_usr_print("[%s] station found ...\n", __func__);
 				} else {
-					V(TT_NET, "[%s] station not found...\n", __func__);
+// 					nrc_usr_print("[%s] station not found...\n", __func__);
 				}
 			} else {
-				V(TT_NET, "[%s] nrc_wpa_if not AP...\n", __func__);
+// 				nrc_usr_print("[%s] nrc_wpa_if not AP...\n", __func__);
 			}
 		}
 	}
-	V(TT_NET, "[%s] buffer of size %d received...\n", __func__, length);
+// 	nrc_usr_print("[%s] buffer of size %d received...\n", __func__, length);
 //	print_buffer(buffer, length);
 
 	if ((buffer == NULL) || !netif_is_up(&eth_netif)) {
@@ -269,17 +272,18 @@ static nrc_err_t eth_stack_input_handler(esp_eth_handle_t eth_handle, uint8_t *b
 			break;
 
 		default:
-			V(TT_NET, "[%s] unknown packet...\n", __func__);
+			nrc_usr_print("[%s] unknown packet type 0x%X\n", __func__, htons(ethhdr->type));
 			break;
 	}
-	V(TT_NET, "[%s] free buffer...\n", __func__);
+
 	free(buffer);
 	return NRC_SUCCESS;
 }
 
 static nrc_err_t eth_linkup_handler(esp_eth_handle_t eth_handle)
 {
-	I(TT_NET, "[%s] ethernet link detected...\n", __func__);
+	nrc_usr_print("[%s] ethernet link detected...\n", __func__);
+
 	netif_set_link_up(&eth_netif);
 
 	if (eth_mode == NRC_ETH_MODE_AP) {
@@ -297,7 +301,7 @@ static nrc_err_t eth_linkup_handler(esp_eth_handle_t eth_handle)
 
 static nrc_err_t eth_linkdown_handler(esp_eth_handle_t eth_handle)
 {
-	I(TT_NET, "[%s] ethernet disconnected...\n", __func__);
+	nrc_usr_print("[%s] ethernet disconnected...\n", __func__);
 
 	if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
 		if (eth_mode == NRC_ETH_MODE_AP) {
@@ -323,7 +327,6 @@ static nrc_err_t eth_linkdown_handler(esp_eth_handle_t eth_handle)
 
 void nrc_eth_raw_transmit(uint8_t *buffer, uint32_t length)
 {
-	V(TT_NET, "[%s] transmitting length [%d]...\n", __func__, length);
 	nrc_eth_mac->transmit(nrc_eth_mac, buffer, length);
 }
 
@@ -363,7 +366,9 @@ nrc_err_t ethernet_init(uint8_t *mac_addr)
     mac_config.smi_mdc_gpio_num = -1;
     mac_config.smi_mdio_gpio_num = -1;
 #ifdef ETH_DRIVER_ENC28J60
-    esp_eth_mac_t *mac = esp_eth_mac_new_enc28j60(&mac_config);
+    eth_enc28j60_config_t enc_config;
+    enc_config.int_gpio_num = GPIO_10;
+    esp_eth_mac_t *mac = esp_eth_mac_new_enc28j60(&enc_config, &mac_config);
 #endif
 #ifdef ETH_DRIVER_W5500
 	esp_eth_mac_t *mac = esp_eth_mac_new_w5500(&mac_config);
@@ -372,6 +377,7 @@ nrc_err_t ethernet_init(uint8_t *mac_addr)
     phy_config.autonego_timeout_ms = 0; // ENC28J60 doesn't support auto-negotiation
     phy_config.reset_gpio_num = -1; // ENC28J60 doesn't have a pin to reset internal PHY
 #ifdef ETH_DRIVER_ENC28J60
+    phy_config.reset_gpio_num = GPIO_09;
     esp_eth_phy_t *phy = esp_eth_phy_new_enc28j60(&phy_config);
 #endif
 #ifdef ETH_DRIVER_W5500
@@ -379,15 +385,15 @@ nrc_err_t ethernet_init(uint8_t *mac_addr)
 #endif
     esp_eth_config_t eth_config = ETH_DEFAULT_CONFIG(mac, phy);
     eth_config.stack_input = eth_stack_input_handler;
-    eth_config.on_linkup = eth_linkup_handler;
-    eth_config.on_linkdown = eth_linkdown_handler;
+//     eth_config.on_linkup = eth_linkup_handler;
+//     eth_config.on_linkdown = eth_linkdown_handler;
     esp_eth_handle_t eth_handle = NULL;
-
+    
     if (esp_eth_driver_install(&eth_config, &eth_handle) != NRC_SUCCESS) {
 		nrc_usr_print("[%s] Error installing ethernet driver...\n", __func__);
 		return NRC_FAIL;
 	}
-
+	
     /* ENC28J60 doesn't burn any factory MAC address, we need to set it manually.
        02:00:00 is a Locally Administered OUI range so should not be used except when testing on a LAN under your control.
     */
@@ -396,20 +402,27 @@ nrc_err_t ethernet_init(uint8_t *mac_addr)
 #ifdef ETH_DRIVER_ENC28J60
         0x02, 0x00, 0x00, 0x12, 0x28, 0x60
 #else
-		0x02, 0x00, 0x00, 0x12, 0x55, 0x00
+	0x02, 0x00, 0x00, 0x12, 0x55, 0x00
 #endif
 		});
 	} else {
 		mac->set_addr(mac, mac_addr);
 	}
 
-    /* set ethernet interface in promiscuous mode to act as bridge */
+	/* set ethernet interface in promiscuous mode to act as bridge */
 	mac->set_promiscuous(mac, true);
 
-    /* attach Ethernet driver to TCP/IP stack */
-    nrc_bind_eth_if(mac);
+#ifdef ETH_DRIVER_ENC28J60
+	/* set to full duplex */
+	mac->set_duplex(mac, ETH_DUPLEX_FULL);
+	phy->set_duplex(phy, ETH_DUPLEX_FULL);
+#endif
+	
+	/* attach Ethernet driver to TCP/IP stack */
+	nrc_bind_eth_if(mac);
 
-    /* start Ethernet driver state machine */
+
+	/* start Ethernet driver state machine */
 	if (esp_eth_start(eth_handle) != NRC_SUCCESS) {
 		nrc_usr_print("[%s] Error starting ethernet...\n", __func__);
 		return NRC_FAIL;

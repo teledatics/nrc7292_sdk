@@ -26,6 +26,8 @@
 #ifndef __NRC_TYPES_H__
 #define __NRC_TYPES_H__
 
+#include "stdbool.h" 
+
 // Type Definition
 typedef signed char                 int8_t;
 typedef unsigned char               uint8_t;

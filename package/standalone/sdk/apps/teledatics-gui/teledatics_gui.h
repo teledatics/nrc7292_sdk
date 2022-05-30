@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -23,31 +23,30 @@
  *
  */
 
- /**
+/**
  * @file teledatics_gui.h
  * @author James Ewing
  * @date 24 Mar 2022
  * @brief Teledatics HTML GUI for Halo TD-XPAH
  */
- 
+
 #include "nrc_sdk.h"
 
 #include <api_wifi.h>
 #include <dhcpserver.h>
-#include <esp_http_server.h>
 #include <esp_err.h>
+#include <esp_http_server.h>
 #include <lwip.h>
-#include <nrc_types.h>
 #include <mbedtls/tls_base64.h>
+#include <nrc_types.h>
 
-#include "wifi_config_setup.h"
-#include "wifi_config.h"
-#include "wifi_connect_common.h"
 #include "nrc_types.h"
 #include "nvs.h"
-#include "nvs_flash.h"
 #include "nvs_config.h"
-
+#include "nvs_flash.h"
+#include "wifi_config.h"
+#include "wifi_config_setup.h"
+#include "wifi_connect_common.h"
 
 #ifndef TELEDATICS_WIFI_H
 #define TELEDATICS_WIFI_H
@@ -105,27 +104,29 @@
 #define MAX_WIFI_INIT_TRIES 64
 #define HTML_BUF_LEN 32767
 
-#define HAVE_AIR_QUALITY_SENSOR_HAT     1
-#define HAVE_ETHERNET_HAT               2
-#define HAVE_WIFI_GW_HAT                4
-#define HAVE_ARDUCAM_SPI_CAMERA         8
+#define HAVE_AIR_QUALITY_SENSOR_HAT 1
+#define HAVE_ETHERNET_HAT 2
+#define HAVE_WIFI_GW_HAT 4
+#define HAVE_ARDUCAM_SPI_CAMERA 8
 
 extern int should_quit;
 extern httpd_handle_t http_server;
 
-typedef struct {
-        uint8_t wifi_mode;
-        uint8_t ppp_enable;
-        char ipv6_addr[255];
-        uint64_t accessories;
-        WIFI_CONFIG nrc_wifi_config;
+typedef struct
+{
+  uint8_t wifi_mode;
+  uint8_t ppp_enable;
+  char ipv6_addr[255];
+  uint64_t accessories;
+  WIFI_CONFIG nrc_wifi_config;
 } td_wifi_config_t;
 
-nrc_err_t td_validate_params(td_wifi_config_t *tf_config);
-void td_print_settings(td_wifi_config_t *tf_config);
-nrc_err_t td_save_wifi_config(td_wifi_config_t *tf_config);
-nrc_err_t td_set_wifi_default(td_wifi_config_t *tf_config);
-nrc_err_t td_get_wifi_config(td_wifi_config_t *tf_config);
+td_wifi_config_t* td_get_global_config(void);
+nrc_err_t td_validate_params(td_wifi_config_t* tf_config);
+void td_print_settings(td_wifi_config_t* tf_config);
+nrc_err_t td_save_wifi_config(td_wifi_config_t* tf_config);
+nrc_err_t td_set_wifi_default(td_wifi_config_t* tf_config);
+nrc_err_t td_get_wifi_config(td_wifi_config_t* tf_config);
 
 void td_shutdown_ap(void);
 void td_shutdown_client(void);
@@ -136,21 +137,25 @@ nrc_err_t td_run_wifi_mesh(td_wifi_config_t* tf_config);
 
 extern httpd_uri_t setup_page;
 extern httpd_uri_t update_settings;
-esp_err_t setup_page_http(httpd_req_t *req);
-esp_err_t update_settings_handler(httpd_req_t *req);
+esp_err_t setup_page_http(httpd_req_t* req);
+esp_err_t update_settings_handler(httpd_req_t* req);
 httpd_handle_t run_http_server(td_wifi_config_t* tf_config);
 void stop_http_server(void);
 
 int td_start_ppp(void);
 int td_stop_ppp(void);
 
-#define has_air_quality_hat(x)  (x && (x->accessories &  HAVE_AIR_QUALITY_SENSOR_HAT) ? 1 : 0)
-#define has_ethernet_hat(x)  (x && (x->accessories &  HAVE_ETHERNET_HAT) ? 1 : 0)
-#define has_wifi_gw_hat(x)  (x && (x->accessories &  HAVE_WIFI_GW_HAT) ? 1 : 0)
-#define has_arducam_camera(x)  (x && (x->accessories &  HAVE_ARDUCAM_SPI_CAMERA) ? 1 : 0)
+#define has_air_quality_hat(x)  (x && (x->accessories & HAVE_AIR_QUALITY_SENSOR_HAT) ? 1 : 0)
+#define has_ethernet_hat(x)     (x && (x->accessories & HAVE_ETHERNET_HAT) ? 1 : 0)
+#define has_wifi_gw_hat(x)      (x && (x->accessories & HAVE_WIFI_GW_HAT) ? 1 : 0)
+#define has_arducam_camera(x)   (x && (x->accessories & HAVE_ARDUCAM_SPI_CAMERA) ? 1 : 0)
 nrc_err_t td_init_accessories(td_wifi_config_t* tf_config);
 
 void restart_system(void);
-char * subst_string(char* dest, char *old, const char *new);
+char* subst_string(char* dest, char* old, const char* new);
+
+#ifdef DO_PROFILING
+void runStats(void);
+#endif
 
 #endif /* TELEDATICS_WIFI_H */
