@@ -31,6 +31,7 @@
  */
 
 #include "nrc_eth_if.h"
+#include "nrc_esp32_if.h"
 #include "teledatics_gui.h"
 #include "teledatics_gui_air_quality.h"
 #include "teledatics_gui_ethernet.h"
@@ -62,41 +63,68 @@ td_check_arducam_camera_hat(void)
 nrc_err_t
 td_init_accessories(td_wifi_config_t* tf_config)
 {
+  nrc_usr_print("[%s] start\n", __func__);
 
   if (!tf_config)
     return NRC_FAIL;
 
   tf_config->accessories = 0;
-
-  if (td_init_air_quality_hat() == NRC_SUCCESS) {
-    nrc_usr_print("[%s] found air quality sensor hAT\n", __func__);
-    tf_config->accessories |= HAVE_AIR_QUALITY_SENSOR_HAT;
-  } else if (td_check_ethernet_hat() == NRC_SUCCESS) {
-    nrc_usr_print("[%s] found ethernet hAT\n", __func__);
-    tf_config->accessories |= HAVE_ETHERNET_HAT;
-  } else if (td_check_wifi_gw_hat() == NRC_SUCCESS) {
-    td_shutdown_air_quality_hat();
-    nrc_usr_print("[%s] found Wi-Fi gateway hAT\n", __func__);
-    tf_config->accessories |= HAVE_WIFI_GW_HAT;
-  } else if (td_check_arducam_camera_hat() == NRC_SUCCESS) {
+  
+  if (td_check_arducam_camera_hat() == NRC_SUCCESS) {
     nrc_usr_print("[%s] found SPI camera hAT\n", __func__);
     tf_config->accessories |= HAVE_ARDUCAM_SPI_CAMERA;
-  } else {
-    nrc_usr_print("[%s] no accessories found\n", __func__);
+  } 
+#if defined(SUPPORT_SHT30) || defined(SUPPORT_SGP30)
+  else if (td_init_air_quality_hat() == NRC_SUCCESS) {
+    nrc_usr_print("[%s] found air quality sensor hAT\n", __func__);
+    tf_config->accessories |= HAVE_AIR_QUALITY_SENSOR_HAT;
+  }
+#endif
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT) && defined(ETH_DRIVER_ENC28J60)
+  else if (td_check_ethernet_hat() == NRC_SUCCESS) {
+    nrc_usr_print("[%s] found ethernet hAT\n", __func__);
+    tf_config->accessories |= HAVE_ETHERNET_HAT;
+  }
+#endif
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT) && defined(SUPPORT_ESP_HOSTED)
+  else if (td_check_wifi_gw_hat() == NRC_SUCCESS) {
+#if defined(SUPPORT_SHT30) || defined(SUPPORT_SGP30)
     td_shutdown_air_quality_hat();
+#endif
+    nrc_usr_print("[%s] found Wi-Fi gateway hAT\n", __func__);
+    tf_config->accessories |= HAVE_WIFI_GW_HAT;
+  }
+#endif
+  else {
+    nrc_usr_print("[%s] no accessories found\n", __func__);
+#if defined(SUPPORT_SHT30) || defined(SUPPORT_SGP30)
+    td_shutdown_air_quality_hat();
+#endif
   }
 
   if (!has_ethernet_hat(tf_config) && !has_wifi_gw_hat(tf_config)) {
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT)
     set_network_mode(NRC_NETWORK_MODE_NAT);
-  } else if (has_ethernet_hat(tf_config)) {
+#endif
+  } 
+  else if (has_ethernet_hat(tf_config)) {
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT) && defined(ETH_DRIVER_ENC28J60)
     uint8_t* eth_mac;
     set_network_mode(NRC_NETWORK_MODE_BRIDGE);
     eth_mac = get_eth_standalone_macaddr();
     ethernet_init(eth_mac);
-  } else if (has_wifi_gw_hat(tf_config)) {
+#endif
+  }
+  else if (has_wifi_gw_hat(tf_config)) {
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT) && defined(SUPPORT_ESP_HOSTED)
+    uint8_t* esp32_mac;
     set_network_mode(NRC_NETWORK_MODE_BRIDGE);
-    //                 wifi_gw_init(NULL);
+    esp32_mac = get_eth_standalone_macaddr();
+    esp32_init(esp32_mac);
+#endif
   }
 
+  nrc_usr_print("[%s] exit\n", __func__);
+  
   return NRC_SUCCESS;
 }

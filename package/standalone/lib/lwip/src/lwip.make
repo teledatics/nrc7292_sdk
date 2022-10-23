@@ -88,6 +88,11 @@ LWIP_PORTING_ETH = \
 	nrc_eth_if.c
 endif
 
+ifeq ($(CONFIG_ESP_HOSTED), y)
+LWIP_PORTING_ESP_HOSTED = \
+	nrc_esp32_if.c
+endif
+
 LWIP_APPS= \
 	dhcpserver.c \
 	captdns.c \
@@ -104,4 +109,5 @@ CSRCS += \
 	$(PPPFILES) \
 	$(LWIP_PORTING)\
 	$(LWIP_APPS) \
-	$(LWIP_PORTING_ETH)
+	$(LWIP_PORTING_ETH) \
+	$(LWIP_PORTING_ESP_HOSTED)

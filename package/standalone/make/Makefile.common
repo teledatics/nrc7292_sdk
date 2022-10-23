@@ -43,6 +43,8 @@ endif
 	@$(NM) $(NMFLAGS) $(OUT_PATH)/$(OUTPUT).elf > $(OUT_PATH)/$(OUTPUT).nm
 	@$(READELF) -a $(OUT_PATH)/$(OUTPUT).elf > $(OUT_PATH)/$(OUTPUT)_readelf.txt
 	@$(SZ) $(OUT_PATH)/$(OUTPUT).elf
+	@echo "listing 30 largest functions"
+	@$(NM) --print-size --size-sort --radix=d $(OUT_PATH)/$(OUTPUT).elf | tail -30
 
 $(OBJ_PATH)/%.o:%.cpp
 	@echo "compile $<"

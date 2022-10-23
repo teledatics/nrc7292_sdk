@@ -139,11 +139,14 @@ sensors_init(sht_sensor_t* sensor)
 
 #ifdef SUPPORT_SHT30
   rslt = sht30_init(&sensor->sht30);
+  
+  nrc_usr_print("[%s] sht30_init %d\n", __func__, rslt);
 #endif
 
 #ifdef SUPPORT_SGP30
   if (rslt == SENSOR_OK) {
     rslt = sgp30_init(&sensor->sgp30);
+    nrc_usr_print("[%s] sgp30_init %d\n", __func__, rslt);
 #ifdef SUPPORT_SHT30
     if (rslt == SENSOR_OK) {
       td_set_absolute_humidity(td_get_air_quality_temperature(),

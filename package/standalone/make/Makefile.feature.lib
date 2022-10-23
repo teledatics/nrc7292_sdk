@@ -365,6 +365,43 @@ endif
 
 #// --------------------------------------------------
 #// LIB
+#// esp-hosted
+#// --------------------------------------------------
+ESP_HOSTED_ROOT		= $(LIB_PATH)/esp-hosted/esp_hosted_fg
+ESP_HOSTED_DIR		= $(ESP_HOSTED_ROOT)/host
+ESP_HOSTED_DEVICE	= $(ESP_HOSTED_DIR)/td-xpah
+
+ESP_HOSTED_PATH 	+= $(ESP_HOSTED_ROOT)/common/protobuf-c
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DEVICE)/common
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_ROOT)/common
+ESP_HOSTED_PATH 	+= $(ESP_HOSTED_ROOT)/common/include
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DIR)/components/include		
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DIR)/components/src
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DIR)/control_lib/include
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DIR)/control_lib/src/include
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DIR)/control_lib/src
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DIR)/virtual_serial_if/include
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DIR)/virtual_serial_if/src
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DEVICE)/driver/netif
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DEVICE)/driver/network
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DEVICE)/driver/serial
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DEVICE)/driver/spi
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DEVICE)/port/src
+# ESP_HOSTED_PATH 	+= $(ESP_HOSTED_DEVICE)/port/include
+
+
+INCLUDE	+= $(addprefix -I,$(ESP_HOSTED_PATH))
+
+ifeq ($(CONFIG_ESP_HOSTED), y)
+	include $(ESP_HOSTED_DEVICE)/esp-hosted.make
+# 	CSRCS	+= $(notdir $(ESP_HOSTED_CSRCS))
+# 	SRCS	+= $(notdir $(ESP_HOSTED_SRCS))	
+	VPATH	+= $(ESP_HOSTED_PATH)
+	DEFINE	+= -DSUPPORT_ESP_HOSTED
+endif # CONFIG_ESP_HOSTED
+
+#// --------------------------------------------------
+#// LIB
 #// LWIP PPP
 #// put at end due to binary only library libModem.a dependency problems
 #// --------------------------------------------------

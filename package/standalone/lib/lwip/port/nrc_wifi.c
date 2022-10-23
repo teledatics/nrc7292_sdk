@@ -241,6 +241,9 @@ bool wifi_ifconfig(int num_param, char *params[])
 		if_idx = 1;
 		nif = nrc_netif[if_idx];
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
+	} else if (strcmp(if_name, "wlan2") == 0 && get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+		if_idx = 2;
+		nif = &eth_netif;
 	} else if (strcmp(if_name, "eth") == 0 && get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 		if_idx = 2;
 		nif = &eth_netif;

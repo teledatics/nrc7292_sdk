@@ -44,6 +44,10 @@
 #define SENSOR_OK 0
 #define SENSOR_FAIL -1
 
+#ifndef UNKNOWN_VALUE
+#define UNKNOWN_VALUE NAN
+#endif
+
 nrc_err_t td_init_air_quality_hat(void);
 nrc_err_t td_shutdown_air_quality_hat(void);
 float td_get_air_quality_temperature(void);

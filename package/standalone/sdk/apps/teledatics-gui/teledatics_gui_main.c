@@ -454,11 +454,15 @@ td_init(td_wifi_config_t* tf_config)
 
   nrc_uart_console_enable(true);
 
+  nrc_usr_print("[%s]\n", __func__);
+  
   if (td_get_wifi_config(tf_config) != NRC_SUCCESS)
     goto failed;
 
+  nrc_usr_print("[%s] td_init_accessories\n", __func__);
   td_init_accessories(tf_config);
 
+  nrc_usr_print("[%s] td_set_global_config\n", __func__);
   td_set_global_config(tf_config);
 
   return NRC_SUCCESS;
@@ -519,17 +523,21 @@ user_init(void)
 
 #ifdef DO_PROFILING
   // run profiler output on 2nd USB port /dev/ttyUSB1
+  nrc_usr_print("[%s] Profiling active\n", __func__);
   runStats();
 #endif
 
   if (td_init(&tf_config) != NRC_SUCCESS) {
+    nrc_usr_print("[%s] td_init failed\n", __func__);
     return;
   }
 
   if (tf_config.ppp_enable) {
+    nrc_usr_print("[%s] start ppp\n", __func__);
     td_start_ppp();
   }
 
+  nrc_usr_print("[%s] start while(1)\n", __func__);
   while (should_quit == 0) {
     td_run_wifi(&tf_config);
     _delay_ms(1);

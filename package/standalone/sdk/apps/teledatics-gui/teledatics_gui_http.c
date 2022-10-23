@@ -34,14 +34,15 @@
 #include "teledatics_gui.h"
 #include "teledatics_gui_air_quality.h"
 #include "teledatics_gui_ethernet.h"
+#include "teledatics_lzo_decompress.h"
 
 #include "standalone.h"
 
 // global http server handle
 httpd_handle_t http_server = NULL;
 
-// global HTML buffer
-static char html_buffer[HTML_BUF_LEN];
+// global http buffer
+static char html_buffer[HTML_BUF_LEN] = {0};
 
 /**
  * @brief get air quality sensor values
@@ -62,9 +63,9 @@ td_get_air_quality_data(char* data, int len)
 
   temp = td_get_air_quality_temperature();
   humidity = td_get_air_quality_humidity();
-
+#if defined(SUPPORT_SHT30) && defined(SUPPORT_SGP30)
   td_set_absolute_humidity(temp, humidity);
-
+#endif
   co2 = td_get_air_quality_co2();
   voc = td_get_air_quality_voc();
 
@@ -251,22 +252,36 @@ esp_err_t
 setup_page_http(httpd_req_t* req)
 {
   td_wifi_config_t* tf_config;
-  size_t html_len;
+  size_t html_len, buf_len;
   int ret;
+  uint8_t buf[8192];
 
-  memset(html_buffer, 0, sizeof(html_buffer));
+  nrc_usr_print("[%s]\n", __func__);
+  
+  tf_config = (td_wifi_config_t*)req->user_ctx;
 
-  ret = mbedtls_base64_decode((uint8_t*)html_buffer,
-                              sizeof(html_buffer),
-                              &html_len,
+  memset(buf, 0, 8*1024);
+
+  ret = mbedtls_base64_decode((uint8_t*)buf,
+                              8*1204,
+                              &buf_len,
                               (uint8_t*)html_base64,
                               strlen(html_base64));
-  if (ret || html_len <= 0) {
-    nrc_usr_print("base64 decode error ret %d html_len %d\n", ret, html_len);
+
+  if (ret || buf_len <= 0) {
+    nrc_usr_print("base64 decode error ret %d buf_len %d\n", ret, buf_len);
     return ESP_ERR_HTTPD_INVALID_REQ;
   }
 
-  tf_config = (td_wifi_config_t*)req->user_ctx;
+  html_len = HTML_BUF_LEN;
+  memset(html_buffer, 0, HTML_BUF_LEN);
+
+  ret = lzop_decompress(buf, buf_len, (unsigned char *)html_buffer, &html_len);
+
+  if (ret || html_len <= 0) {
+    nrc_usr_print("lzo decompress error ret %d html_len %d\n", ret, html_len);
+    return ESP_ERR_HTTPD_INVALID_REQ;
+  }
 
   subst_wifi_values(html_buffer, tf_config);
 
@@ -297,9 +312,9 @@ update_settings_handler(httpd_req_t* req)
 
   req_len = httpd_req_get_url_query_len(req) + 1;
 
-  if (req_len < sizeof(html_buffer)) {
-
-    tf_config = (td_wifi_config_t*)req->user_ctx;
+  tf_config = (td_wifi_config_t*)req->user_ctx;
+    
+  if (req_len < HTML_BUF_LEN) {
 
     if (httpd_req_get_url_query_str(req, html_buffer, req_len) == ESP_OK) {
 
@@ -393,7 +408,7 @@ update_settings_handler(httpd_req_t* req)
         strcat(ipv4, ".");
 
         httpd_query_key_value(
-          html_buffer, "wifi_static_ip4", (char*)tmp, sizeof(tmp));
+         html_buffer, "wifi_static_ip4", (char*)tmp, sizeof(tmp));
 
         strcat(ipv4, tmp);
 
@@ -668,12 +683,15 @@ run_http_server(td_wifi_config_t* tf_config)
 
   if (http_server) {
     nrc_usr_print("[%s]: set up callbacks\n", __func__);
+
     setup_page.user_ctx = update_settings.user_ctx = update_ws_data.user_ctx =
       (void*)tf_config;
     httpd_register_uri_handler(http_server, &setup_page);
     httpd_register_uri_handler(http_server, &update_settings);
     httpd_register_uri_handler(http_server, &update_ws_data);
+
     nrc_usr_print("[%s]: http server started\n", __func__);
+
     return http_server;
   }
 
