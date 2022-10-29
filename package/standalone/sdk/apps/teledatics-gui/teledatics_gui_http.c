@@ -492,7 +492,8 @@ update_settings_handler(httpd_req_t* req)
     td_validate_params(tf_config);
     td_save_wifi_config(tf_config);
     td_print_settings(tf_config);
-
+    td_shutdown_accessories(tf_config);
+    
     _delay_ms(1000);
 
     restart_system();

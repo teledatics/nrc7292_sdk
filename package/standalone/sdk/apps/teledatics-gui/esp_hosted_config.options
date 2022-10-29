@@ -22,3 +22,4 @@ CtrlMsg_Req_VendorIEData.payload max_size:64
 CtrlMsg_Event_ESPInit.init_data max_length:4
 CtrlMsg_Event_StationDisconnectFromESPSoftAP.mac max_size:18
 CtrlMsg_Resp_SoftAPConnectedSTA.stations max_count:20
+CtrlMsg_Event_ESPInit.init_data max_size:4

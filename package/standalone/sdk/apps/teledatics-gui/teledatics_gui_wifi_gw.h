@@ -478,4 +478,5 @@ typedef struct Ctrl_cmd_t {
 } ctrl_cmd_t;
 
 nrc_err_t td_check_wifi_gw_hat(void);
+nrc_err_t shutdown_wifi_gw(void);
 #endif /* TELEDATICS_WIFI_GW_H */

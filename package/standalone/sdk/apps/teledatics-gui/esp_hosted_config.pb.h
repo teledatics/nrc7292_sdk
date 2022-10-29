@@ -138,11 +138,6 @@ typedef enum ctrl_msg_id {
 } ctrl_msg_id_t;
 
 /* Struct definitions */
-/* * Event structure * */
-typedef struct ctrl_msg_event_esp_init {
-    pb_callback_t init_data;
-} ctrl_msg_event_esp_init_t;
-
 typedef struct ctrl_msg_req_get_ap_config {
     char dummy_field;
 } ctrl_msg_req_get_ap_config_t;
@@ -185,6 +180,12 @@ typedef struct connected_sta_list {
     int32_t rssi;
 } connected_sta_list_t;
 
+typedef PB_BYTES_ARRAY_T(4) ctrl_msg_event_esp_init_init_data_t;
+/* * Event structure * */
+typedef struct ctrl_msg_event_esp_init {
+    ctrl_msg_event_esp_init_init_data_t init_data;
+} ctrl_msg_event_esp_init_t;
+
 typedef struct ctrl_msg_event_heartbeat {
     int32_t hb_num;
 } ctrl_msg_event_heartbeat_t;
@@ -217,7 +218,7 @@ typedef struct ctrl_msg_req_get_mac_address {
     int32_t mode;
 } ctrl_msg_req_get_mac_address_t;
 
-typedef PB_BYTES_ARRAY_T(100) ctrl_msg_req_ota_write_ota_data_t;
+typedef PB_BYTES_ARRAY_T(64) ctrl_msg_req_ota_write_ota_data_t;
 typedef struct ctrl_msg_req_ota_write {
     ctrl_msg_req_ota_write_ota_data_t ota_data;
 } ctrl_msg_req_ota_write_t;
@@ -247,7 +248,7 @@ typedef struct ctrl_msg_req_start_soft_ap {
 } ctrl_msg_req_start_soft_ap_t;
 
 typedef PB_BYTES_ARRAY_T(3) ctrl_msg_req_vendor_ie_data_vendor_oui_t;
-typedef PB_BYTES_ARRAY_T(100) ctrl_msg_req_vendor_ie_data_payload_t;
+typedef PB_BYTES_ARRAY_T(64) ctrl_msg_req_vendor_ie_data_payload_t;
 typedef struct ctrl_msg_req_vendor_ie_data {
     int32_t element_id;
     int32_t length;
@@ -571,7 +572,7 @@ extern "C" {
 #define CTRL_MSG_RESP_GET_WIFI_CURR_TX_POWER_INIT_DEFAULT {0, 0}
 #define CTRL_MSG_REQ_CONFIG_HEARTBEAT_INIT_DEFAULT {0, 0}
 #define CTRL_MSG_RESP_CONFIG_HEARTBEAT_INIT_DEFAULT {0}
-#define CTRL_MSG_EVENT_ESP_INIT_INIT_DEFAULT     {{{NULL}, NULL}}
+#define CTRL_MSG_EVENT_ESP_INIT_INIT_DEFAULT     {{0, {0}}}
 #define CTRL_MSG_EVENT_HEARTBEAT_INIT_DEFAULT    {0}
 #define CTRL_MSG_EVENT_STATION_DISCONNECT_FROM_AP_INIT_DEFAULT {0}
 #define CTRL_MSG_EVENT_STATION_DISCONNECT_FROM_ESP_SOFT_AP_INIT_DEFAULT {0, {0, {0}}}
@@ -615,16 +616,16 @@ extern "C" {
 #define CTRL_MSG_RESP_GET_WIFI_CURR_TX_POWER_INIT_ZERO {0, 0}
 #define CTRL_MSG_REQ_CONFIG_HEARTBEAT_INIT_ZERO  {0, 0}
 #define CTRL_MSG_RESP_CONFIG_HEARTBEAT_INIT_ZERO {0}
-#define CTRL_MSG_EVENT_ESP_INIT_INIT_ZERO        {{{NULL}, NULL}}
+#define CTRL_MSG_EVENT_ESP_INIT_INIT_ZERO        {{0, {0}}}
 #define CTRL_MSG_EVENT_HEARTBEAT_INIT_ZERO       {0}
 #define CTRL_MSG_EVENT_STATION_DISCONNECT_FROM_AP_INIT_ZERO {0}
 #define CTRL_MSG_EVENT_STATION_DISCONNECT_FROM_ESP_SOFT_AP_INIT_ZERO {0, {0, {0}}}
 #define CTRL_MSG_INIT_ZERO                       {_CTRL_MSG_TYPE_MIN, _CTRL_MSG_ID_MIN, 0, {CTRL_MSG_REQ_GET_MAC_ADDRESS_INIT_ZERO}}
 
 /* Field tags (for use in manual encoding/decoding) */
-#define CTRL_MSG_EVENT_ESP_INIT_INIT_DATA_TAG    1
 #define CONNECTED_STA_LIST_MAC_TAG               1
 #define CONNECTED_STA_LIST_RSSI_TAG              2
+#define CTRL_MSG_EVENT_ESP_INIT_INIT_DATA_TAG    1
 #define CTRL_MSG_EVENT_HEARTBEAT_HB_NUM_TAG      1
 #define CTRL_MSG_EVENT_STATION_DISCONNECT_FROM_AP_RESP_TAG 1
 #define CTRL_MSG_EVENT_STATION_DISCONNECT_FROM_ESP_SOFT_AP_RESP_TAG 1
@@ -996,8 +997,8 @@ X(a, STATIC,   SINGULAR, INT32,    resp,              1)
 #define CTRL_MSG_RESP_CONFIG_HEARTBEAT_DEFAULT NULL
 
 #define CTRL_MSG_EVENT_ESP_INIT_FIELDLIST(X, a) \
-X(a, CALLBACK, SINGULAR, BYTES,    init_data,         1)
-#define CTRL_MSG_EVENT_ESP_INIT_CALLBACK pb_default_field_callback
+X(a, STATIC,   SINGULAR, BYTES,    init_data,         1)
+#define CTRL_MSG_EVENT_ESP_INIT_CALLBACK NULL
 #define CTRL_MSG_EVENT_ESP_INIT_DEFAULT NULL
 
 #define CTRL_MSG_EVENT_HEARTBEAT_FIELDLIST(X, a) \
@@ -1206,9 +1207,8 @@ extern const pb_msgdesc_t ctrl_msg_t_msg;
 #define CTRL_MSG_FIELDS &ctrl_msg_t_msg
 
 /* Maximum encoded size of messages (where known) */
-/* CtrlMsg_Event_ESPInit_size depends on runtime parameters */
-/* CtrlMsg_size depends on runtime parameters */
 #define CONNECTED_STA_LIST_SIZE                  31
+#define CTRL_MSG_EVENT_ESP_INIT_SIZE             6
 #define CTRL_MSG_EVENT_HEARTBEAT_SIZE            11
 #define CTRL_MSG_EVENT_STATION_DISCONNECT_FROM_AP_SIZE 11
 #define CTRL_MSG_EVENT_STATION_DISCONNECT_FROM_ESP_SOFT_AP_SIZE 31
@@ -1222,15 +1222,15 @@ extern const pb_msgdesc_t ctrl_msg_t_msg;
 #define CTRL_MSG_REQ_GET_WIFI_CURR_TX_POWER_SIZE 0
 #define CTRL_MSG_REQ_OTA_BEGIN_SIZE              0
 #define CTRL_MSG_REQ_OTA_END_SIZE                0
-#define CTRL_MSG_REQ_OTA_WRITE_SIZE              102
+#define CTRL_MSG_REQ_OTA_WRITE_SIZE              66
 #define CTRL_MSG_REQ_SCAN_RESULT_SIZE            0
 #define CTRL_MSG_REQ_SET_MAC_ADDRESS_SIZE        31
 #define CTRL_MSG_REQ_SET_MODE_SIZE               11
-#define CTRL_MSG_REQ_SET_SOFT_AP_VENDOR_SPECIFIC_IE_SIZE 149
+#define CTRL_MSG_REQ_SET_SOFT_AP_VENDOR_SPECIFIC_IE_SIZE 112
 #define CTRL_MSG_REQ_SET_WIFI_MAX_TX_POWER_SIZE  11
 #define CTRL_MSG_REQ_SOFT_AP_CONNECTED_STA_SIZE  0
 #define CTRL_MSG_REQ_START_SOFT_AP_SIZE          135
-#define CTRL_MSG_REQ_VENDOR_IE_DATA_SIZE         140
+#define CTRL_MSG_REQ_VENDOR_IE_DATA_SIZE         104
 #define CTRL_MSG_RESP_CONFIG_HEARTBEAT_SIZE      11
 #define CTRL_MSG_RESP_CONNECT_AP_SIZE            31
 #define CTRL_MSG_RESP_GET_AP_CONFIG_SIZE         89
@@ -1249,6 +1249,7 @@ extern const pb_msgdesc_t ctrl_msg_t_msg;
 #define CTRL_MSG_RESP_SET_WIFI_MAX_TX_POWER_SIZE 11
 #define CTRL_MSG_RESP_SOFT_AP_CONNECTED_STA_SIZE 677
 #define CTRL_MSG_RESP_START_SOFT_AP_SIZE         31
+#define CTRL_MSG_SIZE                            1526
 #define SCAN_RESULT_SIZE                         73
 
 #ifdef __cplusplus

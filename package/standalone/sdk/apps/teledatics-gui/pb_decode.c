@@ -17,6 +17,8 @@
 #include "pb_decode.h"
 #include "pb_common.h"
 
+#include "nrc_sdk.h"
+
 /**************************************
  * Declarations internal to this file *
  **************************************/
@@ -304,11 +306,21 @@ bool checkreturn pb_skip_field(pb_istream_t *stream, pb_wire_type_t wire_type)
 {
     switch (wire_type)
     {
-        case PB_WT_VARINT: return pb_skip_varint(stream);
-        case PB_WT_64BIT: return pb_read(stream, NULL, 8);
-        case PB_WT_STRING: return pb_skip_string(stream);
-        case PB_WT_32BIT: return pb_read(stream, NULL, 4);
-        default: PB_RETURN_ERROR(stream, "invalid wire_type");
+        case PB_WT_VARINT: 
+            nrc_usr_print("[%s] PB_WT_VARINT\n", __func__);
+            return pb_skip_varint(stream);
+        case PB_WT_64BIT: 
+            nrc_usr_print("[%s] PB_WT_64BIT\n", __func__);
+            return pb_read(stream, NULL, 8);
+        case PB_WT_STRING: 
+            nrc_usr_print("[%s] PB_WT_STRING\n", __func__);
+            return pb_skip_string(stream);
+        case PB_WT_32BIT: 
+            nrc_usr_print("[%s] PB_WT_32BIT\n", __func__);
+            return pb_read(stream, NULL, 4);
+        default:
+            nrc_usr_print("[%s] %d\n", __func__, wire_type);
+            PB_RETURN_ERROR(stream, "invalid wire_type");
     }
 }
 

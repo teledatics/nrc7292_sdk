@@ -184,36 +184,20 @@ td_save_wifi_config(td_wifi_config_t* tf_config)
 
   td_validate_params(tf_config);
 
-  nvs_set_u8(nvs_handle, TD_WIFI_MODE_TAG, tf_config->wifi_mode);
-  nvs_set_str(
-    nvs_handle, TD_WIFI_SSID_TAG, (char*)tf_config->nrc_wifi_config.ssid);
-  nvs_set_str(nvs_handle,
-              TD_WIFI_PASSWORD_TAG,
-              (char*)tf_config->nrc_wifi_config.password);
-  nvs_set_u8(
-    nvs_handle, TD_WIFI_SECURITY_TAG, tf_config->nrc_wifi_config.security_mode);
-  nvs_set_str(
-    nvs_handle, TD_WIFI_COUNTRY_TAG, (char*)tf_config->nrc_wifi_config.country);
-  nvs_set_u32(
-    nvs_handle, TD_WIFI_CHANNEL_TAG, tf_config->nrc_wifi_config.channel);
-  nvs_set_u8(
-    nvs_handle, TD_WIFI_IP_MODE_TAG, tf_config->nrc_wifi_config.ip_mode);
-  nvs_set_str(nvs_handle,
-              TD_WIFI_STATIC_IP_TAG,
-              (char*)tf_config->nrc_wifi_config.static_ip);
-  nvs_set_str(
-    nvs_handle, TD_WIFI_STATIC_IP_TAG, (char*)tf_config->nrc_wifi_config.ap_ip);
+  nvs_set_u8(nvs_handle,  TD_WIFI_MODE_TAG, tf_config->wifi_mode);
+  nvs_set_str(nvs_handle, TD_WIFI_SSID_TAG, (char*)tf_config->nrc_wifi_config.ssid);
+  nvs_set_str(nvs_handle, TD_WIFI_PASSWORD_TAG, (char*)tf_config->nrc_wifi_config.password);
+  nvs_set_u8(nvs_handle,  TD_WIFI_SECURITY_TAG, tf_config->nrc_wifi_config.security_mode);
+  nvs_set_str(nvs_handle, TD_WIFI_COUNTRY_TAG, (char*)tf_config->nrc_wifi_config.country);
+  nvs_set_u32(nvs_handle, TD_WIFI_CHANNEL_TAG, tf_config->nrc_wifi_config.channel);
+  nvs_set_u8(nvs_handle,  TD_WIFI_IP_MODE_TAG, tf_config->nrc_wifi_config.ip_mode);
+  nvs_set_str(nvs_handle, TD_WIFI_STATIC_IP_TAG, (char*)tf_config->nrc_wifi_config.static_ip);
+  nvs_set_str(nvs_handle, TD_WIFI_STATIC_IP_TAG, (char*)tf_config->nrc_wifi_config.ap_ip);
   nvs_set_str(nvs_handle, TD_WIFI_STATIC_IPV6_TAG, (char*)tf_config->ipv6_addr);
-  nvs_set_str(nvs_handle,
-              TD_WIFI_REMOTE_IP_TAG,
-              (char*)tf_config->nrc_wifi_config.remote_addr);
-  nvs_set_u16(nvs_handle,
-              TD_WIFI_REMOTE_PORT_TAG,
-              tf_config->nrc_wifi_config.remote_port);
-  nvs_set_u8(nvs_handle,
-             TD_WIFI_DHCP_SERVER_TAG,
-             tf_config->nrc_wifi_config.dhcp_server);
-  nvs_set_u8(nvs_handle, TD_WIFI_COUNT_TAG, tf_config->nrc_wifi_config.count);
+  nvs_set_str(nvs_handle, TD_WIFI_REMOTE_IP_TAG, (char*)tf_config->nrc_wifi_config.remote_addr);
+  nvs_set_u16(nvs_handle, TD_WIFI_REMOTE_PORT_TAG, tf_config->nrc_wifi_config.remote_port);
+  nvs_set_u8(nvs_handle,  TD_WIFI_DHCP_SERVER_TAG, tf_config->nrc_wifi_config.dhcp_server);
+  nvs_set_u8(nvs_handle,  TD_WIFI_COUNT_TAG, tf_config->nrc_wifi_config.count);
   nvs_signed_int = (int32_t)tf_config->nrc_wifi_config.interval;
   nvs_set_i32(nvs_handle, TD_WIFI_INTERVAL_TAG, nvs_signed_int);
   nvs_signed_int = (int32_t)tf_config->nrc_wifi_config.short_bcn_interval;
@@ -222,7 +206,7 @@ td_save_wifi_config(td_wifi_config_t* tf_config)
   nvs_set_i32(nvs_handle, TD_WIFI_DURATION_TAG, nvs_signed_int);
   nvs_signed_int = (int32_t)tf_config->nrc_wifi_config.tx_power;
   nvs_set_i32(nvs_handle, TD_WIFI_TXPOWER_TAG, nvs_signed_int);
-  nvs_set_u8(nvs_handle, TD_PPP_ENABLE_TAG, tf_config->ppp_enable);
+  nvs_set_u8(nvs_handle,  TD_PPP_ENABLE_TAG, tf_config->ppp_enable);
 
   err = nvs_commit(nvs_handle);
 
@@ -232,6 +216,7 @@ td_save_wifi_config(td_wifi_config_t* tf_config)
   if (nvs_handle)
     nvs_close(nvs_handle);
 
+   nrc_usr_print("[%s] Success!\n", __func__);
   return NRC_SUCCESS;
 
 failed:
@@ -367,50 +352,27 @@ td_get_wifi_config(td_wifi_config_t* tf_config)
       goto failed;
   }
 
-  nvs_get_u8(nvs_handle, TD_WIFI_MODE_TAG, (uint8_t*)&tf_config->wifi_mode);
-  nvs_get_str(nvs_handle,
-              TD_WIFI_SSID_TAG,
-              (char*)tf_config->nrc_wifi_config.ssid,
-              &length);
-  nvs_get_str(nvs_handle,
-              TD_WIFI_PASSWORD_TAG,
-              (char*)tf_config->nrc_wifi_config.password,
-              &length);
-  nvs_get_u8(nvs_handle,
-             TD_WIFI_SECURITY_TAG,
-             (uint8_t*)&tf_config->nrc_wifi_config.security_mode);
-  nvs_get_str(nvs_handle,
-              TD_WIFI_COUNTRY_TAG,
-              (char*)tf_config->nrc_wifi_config.country,
-              &length);
-  nvs_get_u32(nvs_handle,
-              TD_WIFI_CHANNEL_TAG,
-              (uint32_t*)&tf_config->nrc_wifi_config.channel);
-  nvs_get_u8(nvs_handle,
-             TD_WIFI_IP_MODE_TAG,
-             (uint8_t*)&tf_config->nrc_wifi_config.ip_mode);
-  nvs_get_str(nvs_handle,
-              TD_WIFI_STATIC_IP_TAG,
-              (char*)tf_config->nrc_wifi_config.static_ip,
-              &length);
-  nvs_get_str(nvs_handle,
-              TD_WIFI_STATIC_IP_TAG,
-              (char*)tf_config->nrc_wifi_config.ap_ip,
-              &length);
-  nvs_get_str(
-    nvs_handle, TD_WIFI_STATIC_IPV6_TAG, (char*)tf_config->ipv6_addr, &length);
-  nvs_get_str(nvs_handle,
-              TD_WIFI_REMOTE_IP_TAG,
-              (char*)tf_config->nrc_wifi_config.remote_addr,
-              &length);
-  nvs_get_u16(nvs_handle,
-              TD_WIFI_REMOTE_PORT_TAG,
-              (uint16_t*)&tf_config->nrc_wifi_config.remote_port);
-  nvs_get_u8(nvs_handle,
-             TD_WIFI_DHCP_SERVER_TAG,
-             (uint8_t*)&tf_config->nrc_wifi_config.dhcp_server);
-  nvs_get_u8(
-    nvs_handle, TD_WIFI_COUNT_TAG, (uint8_t*)&tf_config->nrc_wifi_config.count);
+  nvs_get_u8(nvs_handle,  TD_WIFI_MODE_TAG, (uint8_t*)&tf_config->wifi_mode);
+  length = sizeof(tf_config->nrc_wifi_config.ssid);
+  nvs_get_str(nvs_handle, TD_WIFI_SSID_TAG, (char*)tf_config->nrc_wifi_config.ssid, &length);
+  length = sizeof(tf_config->nrc_wifi_config.password);
+  nvs_get_str(nvs_handle, TD_WIFI_PASSWORD_TAG, (char*)tf_config->nrc_wifi_config.password, &length);
+  nvs_get_u8(nvs_handle,  TD_WIFI_SECURITY_TAG, (uint8_t*)&tf_config->nrc_wifi_config.security_mode);
+  length = sizeof(tf_config->nrc_wifi_config.country);
+  nvs_get_str(nvs_handle, TD_WIFI_COUNTRY_TAG,  (char*)tf_config->nrc_wifi_config.country, &length);
+  nvs_get_u32(nvs_handle, TD_WIFI_CHANNEL_TAG, (uint32_t*)&tf_config->nrc_wifi_config.channel);
+  nvs_get_u8(nvs_handle,  TD_WIFI_IP_MODE_TAG, (uint8_t*)&tf_config->nrc_wifi_config.ip_mode);
+  length = sizeof(tf_config->nrc_wifi_config.static_ip);
+  nvs_get_str(nvs_handle, TD_WIFI_STATIC_IP_TAG, (char*)tf_config->nrc_wifi_config.static_ip, &length);
+  length = sizeof(tf_config->nrc_wifi_config.ap_ip);
+  nvs_get_str(nvs_handle, TD_WIFI_STATIC_IP_TAG, (char*)tf_config->nrc_wifi_config.ap_ip, &length);
+  length = sizeof(tf_config->ipv6_addr);
+  nvs_get_str(nvs_handle, TD_WIFI_STATIC_IPV6_TAG, (char*)tf_config->ipv6_addr, &length);
+  length = sizeof(tf_config->nrc_wifi_config.remote_addr);
+  nvs_get_str(nvs_handle, TD_WIFI_REMOTE_IP_TAG, (char*)tf_config->nrc_wifi_config.remote_addr, &length);
+  nvs_get_u16(nvs_handle, TD_WIFI_REMOTE_PORT_TAG, (uint16_t*)&tf_config->nrc_wifi_config.remote_port);
+  nvs_get_u8(nvs_handle,  TD_WIFI_DHCP_SERVER_TAG, (uint8_t*)&tf_config->nrc_wifi_config.dhcp_server);
+  nvs_get_u8(nvs_handle,  TD_WIFI_COUNT_TAG, (uint8_t*)&tf_config->nrc_wifi_config.count);
   nvs_get_i32(nvs_handle, TD_WIFI_INTERVAL_TAG, &nvs_signed_int);
   tf_config->nrc_wifi_config.interval = nvs_signed_int;
   nvs_get_i32(nvs_handle, TD_WIFI_SHORT_BCN_INTERVAL_TAG, &nvs_signed_int);
@@ -419,7 +381,7 @@ td_get_wifi_config(td_wifi_config_t* tf_config)
   tf_config->nrc_wifi_config.tx_power = nvs_signed_int;
   nvs_get_i32(nvs_handle, TD_WIFI_DURATION_TAG, &nvs_signed_int);
   tf_config->nrc_wifi_config.duration = nvs_signed_int;
-  nvs_get_u8(nvs_handle, TD_PPP_ENABLE_TAG, (uint8_t*)&tf_config->ppp_enable);
+  nvs_get_u8(nvs_handle,  TD_PPP_ENABLE_TAG, (uint8_t*)&tf_config->ppp_enable);
 
   td_validate_params(tf_config);
 

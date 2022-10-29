@@ -150,6 +150,7 @@ int td_stop_ppp(void);
 #define has_wifi_gw_hat(x)      (x && (x->accessories & HAVE_WIFI_GW_HAT) ? 1 : 0)
 #define has_arducam_camera(x)   (x && (x->accessories & HAVE_ARDUCAM_SPI_CAMERA) ? 1 : 0)
 nrc_err_t td_init_accessories(td_wifi_config_t* tf_config);
+nrc_err_t td_shutdown_accessories(td_wifi_config_t* tf_config);
 
 void restart_system(void);
 char* subst_string(char* dest, char* old, const char* new);

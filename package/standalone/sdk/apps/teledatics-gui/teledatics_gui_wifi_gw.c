@@ -61,7 +61,6 @@ static SemaphoreHandle_t semaphore_rx_serial = NULL;
 static SemaphoreHandle_t mutex_spi = NULL;
 
 static TaskHandle_t rx_task_id = 0;
-static TaskHandle_t tx_task_id = 0;
 static TaskHandle_t rx_serial_task_id = 0;
 
 static QueueHandle_t rx_queue = NULL;
@@ -70,6 +69,9 @@ static QueueHandle_t tx_queue = NULL;
 #define MAX_SERIAL_INTF    2
 #define TO_SERIAL_INFT_QUEUE_SIZE         100
 static QueueHandle_t rx_queue_serial = NULL;
+
+// forwards
+nrc_err_t esp_send_req(ctrl_cmd_t *cmd);
 
 /**
   * @brief  Next TX buffer in SPI transaction
@@ -84,6 +86,8 @@ static uint8_t * get_tx_buffer(bool *is_valid_tx_buf)
 	uint16_t len = 0;
 	interface_buffer_handle_t buf_handle = {0};
 
+	nrc_usr_print("[%s]\n", __func__);
+	
 	*is_valid_tx_buf = false;
 
         memset(&buf_handle, 0, sizeof(interface_buffer_handle_t));
@@ -102,6 +106,8 @@ static uint8_t * get_tx_buffer(bool *is_valid_tx_buf)
         if (len) {
 		*is_valid_tx_buf = true;
 
+		nrc_usr_print("[%s] rec'd from tx_queue, sending %d bytes w offset %d bytes\n", __func__, len, sizeof(struct esp_payload_header));
+		
 		/* Form Tx header */
 		payload_header = (struct esp_payload_header *) sendbuf;
 		payload = sendbuf + sizeof(struct esp_payload_header);
@@ -111,12 +117,14 @@ static uint8_t * get_tx_buffer(bool *is_valid_tx_buf)
 		payload_header->if_num  = buf_handle.if_num;
 		memcpy(payload, buf_handle.payload, min(len, MAX_ESP_PAYLOAD_SIZE));
 		payload_header->checksum = htole16(compute_checksum(sendbuf,
-				sizeof(struct esp_payload_header)+len));;
+				sizeof(struct esp_payload_header)+len));
+		
+		/* free allocated buffer */
+		if (buf_handle.free_buf_handle && buf_handle.payload)
+			buf_handle.free_buf_handle(buf_handle.payload);
+		
+		print_hex(sendbuf, sizeof(struct esp_payload_header) + len);
 	}
-	
-	/* free allocated buffer */
-	if (buf_handle.free_buf_handle)
-		buf_handle.free_buf_handle(buf_handle.priv_buffer_handle);
 
 	return sendbuf;
 }
@@ -148,6 +156,8 @@ static nrc_err_t spi_transaction(void)
 	nrc_gpio_inputb(GPIO_HANDSHAKE_PIN, &gpio_handshake);
 
 	nrc_gpio_inputb(GPIO_RX_READY_PIN, &gpio_rx_data_ready);
+	
+	nrc_usr_print("[%s] rx_ready %d handshake %d\n", __func__, gpio_rx_data_ready, gpio_handshake);
 
 	if (gpio_handshake == GPIO_LEVEL_HIGH) {
           
@@ -168,8 +178,11 @@ static nrc_err_t spi_transaction(void)
             nrc_spi_stop_xfer(&esp_spi);
             
             xSemaphoreGive(mutex_spi);
-                        
-            nrc_usr_print("[%s] ret %d, read %d bytes\n", __func__, ret, len);
+	
+	   nrc_gpio_inputb(GPIO_HANDSHAKE_PIN, &gpio_handshake);
+	   nrc_gpio_inputb(GPIO_RX_READY_PIN, &gpio_rx_data_ready);
+	    
+            nrc_usr_print("[%s] ret %d, read %d bytes is_valid_tx_buf %d rx_ready %d handshake %d\n", __func__, ret, len, is_valid_tx_buf, gpio_rx_data_ready, gpio_handshake);
 //             print_hex(rxbuf, len);
           }
         }
@@ -191,7 +204,7 @@ static nrc_err_t spi_transaction(void)
 				(len > MAX_ESP_PAYLOAD_SIZE) ||
 				(offset != sizeof(struct esp_payload_header))) {
 
-                                nrc_usr_print("[%s] header error\n", __func__, ret, len);
+                                nrc_usr_print("[%s] header error len %d\n", __func__, ret, len);
                         
 				/* Free up buffer, as one of following -
 				 * 1. no payload to process
@@ -206,6 +219,10 @@ static nrc_err_t spi_transaction(void)
 			} else {
                                 wifi_gw_exists = true;
                                 
+				nrc_usr_print("[%s] decode header\n", __func__);
+				
+				print_hex(rxbuf, sizeof(struct esp_payload_header) + len);
+				
 				rx_checksum = le16toh(payload_header->checksum);
 				payload_header->checksum = 0;
 
@@ -233,7 +250,7 @@ static nrc_err_t spi_transaction(void)
 					buf_handle.flag        = payload_header->flags;
 
                                         nrc_usr_print("[%s] header OK, len %d checksum 0x%X\n", __func__, len, checksum);
-                                        
+					
 					if (pdTRUE != xQueueSend(rx_queue,
 								&buf_handle, portMAX_DELAY)) {
 						nrc_usr_print("Failed to send buffer\n\r");
@@ -276,11 +293,13 @@ void rx_spi_isr(int vector)
 {
   static BaseType_t pxHigherPriorityTaskWoken;
   
+  nrc_usr_print("[%s]\n", __func__);
+    
   if (!rx_ready())
     return;
-  
-  nrc_usr_print("[%s]\n", __func__);
 
+  nrc_usr_print("[%s] take semaphore_rx\n", __func__);
+  
   pxHigherPriorityTaskWoken = pdFALSE;
   xSemaphoreGiveFromISR(semaphore_rx, &pxHigherPriorityTaskWoken);
   portYIELD_FROM_ISR( pxHigherPriorityTaskWoken );
@@ -310,6 +329,9 @@ nrc_err_t parse_tlv(uint8_t* data, uint32_t* pro_len)
 	char* ep_name2 = CTRL_EP_NAME_EVENT;
 	uint64_t len = 0;
 	uint16_t val_len = 0;
+	
+	nrc_usr_print("[%s]\n", __func__);
+	
 	if (data[len] == PROTO_PSER_TLV_T_EPNAME) {
 		len++;
 		val_len = data[len++];
@@ -327,6 +349,7 @@ nrc_err_t parse_tlv(uint8_t* data, uint32_t* pro_len)
 					val_len = data[len++];
 					val_len = (data[len++] << 8) + val_len;
 					*pro_len = val_len;
+					nrc_usr_print("[%s] parsed TLV successfully\n", __func__);
 					return NRC_SUCCESS;
 				} else {
 					nrc_usr_print("Data Type not matched, exp %d, recvd %d\n",
@@ -348,6 +371,48 @@ nrc_err_t parse_tlv(uint8_t* data, uint32_t* pro_len)
 	return NRC_FAIL;
 }
 
+nrc_err_t td_init_esp_wifi(ctrl_cmd_t* cmd)
+{
+	nrc_err_t retval = NRC_FAIL;
+	
+	nrc_usr_print("[%s]\n", __func__);
+	
+	// set cmd SSID, channel, mode, security
+	cmd->msg_type = CTRL_MSG_TYPE_REQ;
+	cmd->msg_id = CTRL_MSG_ID_REQ_SET_WIFI_MODE;
+	cmd->u.wifi_mode.mode = CTRL_WIFI_MODE_STA;
+	
+	retval = esp_send_req(cmd);
+// 	if(!retval)
+// 		goto err;
+
+	nrc_usr_print("[%s] retval %d\n", __func__, retval);
+	
+	cmd->msg_type = CTRL_MSG_TYPE_REQ;
+	cmd->msg_id = CTRL_MSG_ID_REQ_CONNECT_AP;
+	cmd->u.wifi_mode.mode = ESP_WIFI_MODE_AP;
+	strcpy((char*)cmd->u.wifi_ap_config.ssid, "OnHub");
+	strcpy((char*)cmd->u.wifi_ap_config.pwd, "zippity321");
+	strcpy((char*)cmd->u.wifi_ap_config.bssid, "74:E5:F9:97:13:FA");
+// 	memset(cmd->u.wifi_ap_config.bssid, 0, sizeof(cmd->u.wifi_ap_config.bssid));
+	cmd->u.wifi_ap_config.is_wpa3_supported = 0;
+	cmd->u.wifi_ap_config.listen_interval = 0;
+	
+	retval = esp_send_req(cmd);
+	
+	cmd->msg_type = CTRL_MSG_TYPE_REQ;
+	cmd->msg_id = CTRL_MSG_ID_REQ_GET_AP_CONFIG;
+	retval = esp_send_req(cmd);
+	
+// 	if(!retval)
+// 		goto err;
+	
+	nrc_usr_print("[%s] retval %d\n", __func__, retval);
+	
+// err:
+	return retval;
+}
+
 /* This is entry level function when control request APIs are used
  * This function will encode control request in protobuf and send to ESP32
  * It will copy application structure `ctrl_cmd_t` to
@@ -358,28 +423,33 @@ nrc_err_t esp_recv_resp(uint8_t* buf, int len, ctrl_cmd_t* cmd)
   ctrl_msg_t* resp, ctrl_msg = CTRL_MSG_INIT_DEFAULT;
   pb_istream_t npb_istream;
   bool status;
+  nrc_err_t retval = NRC_FAIL;
   
-  nrc_usr_print("[%s]", __func__);
+  nrc_usr_print("[%s]\n", __func__);
   
   if(!buf || !cmd || len <= 0) {
     goto err;
   }
-  
+
   resp = &ctrl_msg;
-    
-//   resp = ctrl_msg__unpack(NULL, len, buf);
+
   npb_istream = pb_istream_from_buffer(buf, len);
   
-  status = pb_decode(&npb_istream, CTRL_MSG_FIELDS, resp);
+  print_hex(buf, len);
 
+  status = pb_decode_ex(&npb_istream, CTRL_MSG_FIELDS, resp, PB_ENCODE_NULLTERMINATED);
+  
   if (!status) {
     goto err;
   }
   
   if (resp->msg_type == CTRL_MSG_TYPE_EVENT) {
 		/* Events are handled only asynchronously */
-		nrc_usr_print("[%s] CTRL_MSG_TYPE_EVENT", __func__);
+		nrc_usr_print("[%s] CTRL_MSG_TYPE_EVENT msg_id %d\n", __func__, resp->msg_id);
 
+// 		if(resp->msg_id == CTRL_MSG_EVENT_ESP_INIT_TAG) {
+// 			td_init_esp_wifi(cmd);
+// 		}
 		/* check if callback is available.
 		 * if not, silently drop the msg */
 // 		if (CALLBACK_AVAILABLE ==
@@ -407,7 +477,7 @@ nrc_err_t esp_recv_resp(uint8_t* buf, int len, ctrl_cmd_t* cmd)
 // 			//CLEANUP_APP_MSG(app_event);
 // 		} else {
 // 			/* silently drop */
-// 			goto err;
+			goto err;
 // 		}
         }
         
@@ -417,7 +487,7 @@ nrc_err_t esp_recv_resp(uint8_t* buf, int len, ctrl_cmd_t* cmd)
 		/* Ctrl responses are handled asynchronously and
 		 * asynchronpusly */
 
-		nrc_usr_print("[%s] CTRL_MSG_TYPE_RESP", __func__);
+		nrc_usr_print("[%s] CTRL_MSG_TYPE_RESP msg_id %d\n", __func__, resp->msg_id);
 		memset(cmd, 0, sizeof(ctrl_cmd_t));
 
 		/* If this was async procedure, timer would have
@@ -479,14 +549,12 @@ nrc_err_t esp_recv_resp(uint8_t* buf, int len, ctrl_cmd_t* cmd)
 // 		hosted_post_semaphore(ctrl_req_sem);
 
 	} else {
-		nrc_usr_print("[%s] CTRL_MSG_TYPE_ERROR", __func__);
+		nrc_usr_print("[%s] CTRL_MSG_TYPE_ERROR\n", __func__);
 		/* 4. some unsupported msg, drop it */
 // 		nrc_usr_print("Incorrect Ctrl Msg Type[%u]\n",proto_msg->msg_type);
 		goto err;
 	}
 
-                
-	/* 2. update basic fields */
 	cmd->msg_type = CTRL_RESP;
 	cmd->msg_id = resp->msg_id;
 
@@ -814,27 +882,13 @@ nrc_err_t esp_recv_resp(uint8_t* buf, int len, ctrl_cmd_t* cmd)
 		}
 	}
 
-	/* 4. Free up buffers */
-// 	ctrl_msg__free_unpacked(resp, NULL);
-	resp = NULL;
 	cmd->resp_event_status = SUCCESS;
         
-  return NRC_SUCCESS;
+  retval = NRC_SUCCESS;
   
 err:
 
-//   if(elem)
-//     free(elem);
-// 
-//   if(app_event)
-//     free(app_event);
-// 
-//   if (resp) {
-//     ctrl_msg__free_unpacked(resp, NULL);		
-//     resp = NULL;
-//   }
-  
-  return NRC_FAIL;
+  return retval;
 }
 
 /**
@@ -851,7 +905,6 @@ static void rx_serial_task(void* pvParameters)
 	/* Any of `CTRL_EP_NAME_EVENT` and `CTRL_EP_NAME_RESP` could be used,
 	 * as both have same strlen in adapter.h */
 	const char* ep_name = CTRL_EP_NAME_RESP;
-	uint8_t *buf = NULL;
 	uint32_t buf_len = 0;
         ctrl_cmd_t cmd = {0};
 
@@ -884,13 +937,16 @@ static void rx_serial_task(void* pvParameters)
 	
 	nrc_usr_print("[%s] rec'd queue entry\n", __func__);
 	
+// 	print_hex(&buf_handle, buf_handle.payload_len + sizeof(buf_handle));
+	
 // 	nrc_usr_print("[%s] xSemaphoreGive rx_queue_serial\n", __func__);
 // 	xSemaphoreGive( semaphore_rx_serial);
 
 	/* proceed only if payload and length are sane */
 	if (!buf_handle.payload || !buf_handle.payload_len) {
+		if(buf_handle.free_buf_handle && buf_handle.payload)
+			buf_handle.free_buf_handle(buf_handle.payload);
 		nrc_usr_print("[%s] payload length error\n", __func__);
-                free(buf_handle.payload);
 		continue;
 	}
 /*
@@ -912,66 +968,45 @@ static void rx_serial_task(void* pvParameters)
  *
  *  int_read_len = 1 + 2 + Endpoint length + 1 + 2
  */
-
 	init_read_len = SIZE_OF_TYPE + SIZE_OF_LENGTH + strlen(ep_name) +
 		SIZE_OF_TYPE + SIZE_OF_LENGTH;
 
 	if(buf_handle.payload_len < init_read_len) {
-		nrc_usr_print("[%s] Incomplete serial buff, return\n", __func__);
-                free(buf_handle.payload);
+		nrc_usr_print("[%s] Incomplete serial buf, return\n", __func__);
+		if(buf_handle.free_buf_handle && buf_handle.payload)
+			buf_handle.free_buf_handle(buf_handle.payload);
 		continue;
 	}
-	
-        buf_len = buf_handle.payload_len;
-        buf = malloc(init_read_len);
-
-	if(!buf) {
-		nrc_usr_print("[%s] memory error\n", __func__);
-                free(buf_handle.payload);
-		continue;
-	}
-	
-        memcpy(buf, buf_handle.payload, init_read_len);
         
 	/* parse_tlv function returns variable payload length
 	 * of received data in buf_len
 	 **/
-	ret = parse_tlv(buf, &buf_len);
+	ret = parse_tlv(buf_handle.payload, &buf_len);
 	if (ret || !buf_len) {
-		free(buf);
-                free(buf_handle.payload);
+		if(buf_handle.free_buf_handle && buf_handle.payload)
+			buf_handle.free_buf_handle(buf_handle.payload);
 		nrc_usr_print("[%s] Failed to parse RX data\n", __func__);
 		continue;
 	}
 
 	if (buf_handle.payload_len < (init_read_len + buf_len)) {
 		nrc_usr_print("[%s] Buf read on serial iface is smaller than expected len\n", __func__);
-		free(buf);
-                free(buf_handle.payload);
+		if(buf_handle.free_buf_handle)
+			buf_handle.free_buf_handle(buf_handle.payload);
 		continue;
 	}
 /*
  * (2) Read variable length of RX data:
  */
-	buf = realloc(buf, buf_len);
-	if(!buf) {
-		nrc_usr_print("[%s] memory error\n", __func__);
-                free(buf_handle.payload);
-                continue;
-	}
-	
-	memcpy(buf, buf_handle.payload+init_read_len, buf_len);
-
-	free(buf_handle.payload);
         
         // parse and handle 'serial' xface receive
         // cmd contains parsed data
-        // Jeesh! Espressif code is horribly written mind-numbing spaghetti awfulness...
-	nrc_usr_print("[%s] esp_recv_resp\n", __func__);
-        esp_recv_resp(buf, buf_len, &cmd);
-        
-        free(buf);
-        
+        esp_recv_resp(buf_handle.payload+init_read_len, buf_len, &cmd);
+	
+	if(buf_handle.free_buf_handle && buf_handle.payload)
+		buf_handle.free_buf_handle(buf_handle.payload);
+
+        buf_len = 0;
         }
 
 }
@@ -1134,7 +1169,9 @@ static void rx_task(void* pvParameters)
             break;
           }
           
-           nrc_usr_print("[%s] received %d bytes\n", __func__, buf_handle.payload_len);
+           nrc_usr_print("[%s] xQueueReceive received %d bytes\n", __func__, buf_handle.payload_len);
+	   
+// 	   print_hex(&buf_handle, sizeof(buf_handle) + buf_handle.payload_len);
           
           /* point to payload */
           payload = buf_handle.payload;
@@ -1142,7 +1179,7 @@ static void rx_task(void* pvParameters)
           /* process received buffer for all possible interface types */
           if (buf_handle.if_type == ESP_SERIAL_IF) {
             
-            nrc_usr_print("[%s] calling serial_rx_handler\n", __func__);
+            nrc_usr_print("[%s] ESP_SERIAL_IF - calling serial_rx_handler\n", __func__);
             
             /* serial interface path */
             serial_rx_handler(&buf_handle);
@@ -1169,14 +1206,15 @@ static void rx_task(void* pvParameters)
 
           } 
           else if (buf_handle.if_type == ESP_PRIV_IF) {
-            
+            uint8_t *pos = NULL;
+
             nrc_usr_print("[%s] ESP_PRIV_IF\n", __func__);
             
             event = (struct esp_priv_event *) (payload);
 
             if (event->event_type == ESP_PRIV_EVENT_INIT) {
-              // delay ??
-//               _delay_ms(500); // NO!
+		    pos = event->event_data;
+		    nrc_usr_print("[%s] Chip ID 0x%X SPI CLK %d Cap 0x%X\n", __func__, *(pos+2), *(pos+5), *(pos+8));
             }
             
             if (buf_handle.free_buf_handle) {
@@ -1192,24 +1230,6 @@ static void rx_task(void* pvParameters)
   }
 }
 
-/**
-  * @brief  RX SPI task
-  * @param  argument: Not used
-  * @retval None
-  */
-static void tx_task(void* pvParameters)
-{
-//   for (;;) 
-//   {
-//     if (semaphore_rx && 
-//         xSemaphoreTake( semaphore_rx, ( TickType_t ) portMAX_DELAY ) == pdTRUE ) {
-      // tx_result = check_for_outgoing_tx_from_queue
-      // spi_transaction(tx_result);
-//       spi_transaction(NULL);
-//     }
-//   }
-}
-
 /* This is entry level function when control request APIs are used
  * This function will encode control request in protobuf and send to ESP32
  * It will copy application structure `ctrl_cmd_t` to
@@ -1219,17 +1239,21 @@ nrc_err_t esp_send_req(ctrl_cmd_t *cmd)
 {
 	int       ret = NRC_FAIL;
 	ctrl_msg_t ctrl = CTRL_MSG_INIT_ZERO;
-	uint32_t  tx_len = 0;
-	uint8_t  *tx_data = NULL;
 	uint8_t  *payload_buf = NULL;
 	void     *vendor_data_buf = NULL;
 	uint8_t   failure_status = 0;
-
+	pb_ostream_t ostream;
+	interface_buffer_handle_t buf_handle = {0};
+	char* ep_name = CTRL_EP_NAME_RESP;
+	int tlv_init_len = SIZE_OF_TYPE + SIZE_OF_LENGTH + strlen(ep_name) + SIZE_OF_TYPE + SIZE_OF_LENGTH;
+	uint8_t  tx_data[sizeof(ctrl)+tlv_init_len];
+	
 	if (!cmd) {
 		failure_status = CTRL_ERR_INCORRECT_ARG;
 		goto err;
 	}
 
+	ostream = pb_ostream_from_buffer(tx_data, sizeof(tx_data));
 
 	/* 1. Check if any ongoing request present
 	 * Send failure in that case */
@@ -1276,6 +1300,7 @@ nrc_err_t esp_send_req(ctrl_cmd_t *cmd)
 				goto err;
 			}
 // 			ctrl_msg__req__get_mac_address__init(req_payload);
+
 			req_payload->mode = cmd->u.wifi_mac.mode;
 
 			break;
@@ -1308,9 +1333,10 @@ nrc_err_t esp_send_req(ctrl_cmd_t *cmd)
 				failure_status = CTRL_ERR_INCORRECT_ARG;
 				goto err;
 			}
+			req_payload->mode = p->mode;
 // 			ctrl_msg__req__set_mode__init(req_payload);
 // 			*req_payload = CTRL_MSG_REQ_SET_MODE_INIT_ZERO;
-			req_payload->mode = p->mode;
+			ctrl.which_payload = CTRL_MSG_REQ_SET_MODE_MODE_TAG;
 			break;
 		} case CTRL_REQ_CONNECT_AP: {
 			wifi_ap_config_t * p = &cmd->u.wifi_ap_config;
@@ -1342,6 +1368,8 @@ nrc_err_t esp_send_req(ctrl_cmd_t *cmd)
 			memcpy(req_payload->bssid, (char *)&p->bssid, strlen((char *)p->bssid));
 			req_payload->is_wpa3_supported = p->is_wpa3_supported;
 			req_payload->listen_interval = p->listen_interval;
+
+			ctrl.which_payload = CTRL_MSG_REQ_CONNECT_AP_TAG;			
 			break;
 		} case CTRL_REQ_SET_SOFTAP_VND_IE: {
 			wifi_softap_vendor_ie_t *p = &cmd->u.wifi_softap_vendor_ie;
@@ -1551,7 +1579,37 @@ nrc_err_t esp_send_req(ctrl_cmd_t *cmd)
 // 		failure_status = CTRL_ERR_TRANSPORT_SEND;
 // 		goto err;
 // 	}
+	
+	pb_encode_ex(&ostream, CTRL_MSG_FIELDS, &ctrl, PB_ENCODE_NULLTERMINATED);
+	nrc_usr_print("[%s] ostream.bytes_written %d\n", __func__, ostream.bytes_written);
+	print_hex(tx_data, ostream.bytes_written);
+
+	memset(&buf_handle, 0, sizeof(buf_handle));
+	buf_handle.if_type = ESP_SERIAL_IF;
+	buf_handle.if_num = 0;
+	buf_handle.payload = calloc(1, sizeof(tx_data));
+	buf_handle.free_buf_handle = free;
+	buf_handle.priv_buffer_handle = buf_handle.payload;
+  
+	if(!buf_handle.payload){
+		nrc_usr_print("[%s] calloc error\n", __func__);
+		goto err;
+	}
+		
+	// wrap in tlv and push to tx_queue, then call spi_transaction
+	buf_handle.payload_len = compose_tlv(buf_handle.payload, tx_data, ostream.bytes_written);
+	
+	nrc_usr_print("[%s] send to tx_queue buf_handle.payload_len %d\n", __func__, buf_handle.payload_len);
+	
+	print_hex(buf_handle.payload, buf_handle.payload_len);
+	
+	if (pdTRUE != xQueueSend(tx_queue, &buf_handle, portMAX_DELAY)) {
+		nrc_usr_print("Failed to send buffer to_slave_queue\n\r");
+		goto err;
+	}
         
+        spi_transaction();
+	
         ret = NRC_SUCCESS;
 
 err:	
@@ -1568,20 +1626,20 @@ err:
 // 			goto err2;
 // 		}
 // 		memset(app_resp, 0, sizeof(ctrl_cmd_t));
-		cmd->msg_type = CTRL_RESP;
-		cmd->msg_id = (cmd->msg_id - CTRL_REQ_BASE + CTRL_RESP_BASE);
-		cmd->resp_event_status = failure_status;
+// 		cmd->msg_type = CTRL_RESP;
+// 		cmd->msg_id = (cmd->msg_id - CTRL_REQ_BASE + CTRL_RESP_BASE);
+// 		cmd->resp_event_status = failure_status;
 
 		/* 12. In async procedure, it is important to get
 		 * some kind of acknowledgement to user */
-		cmd->ctrl_resp_cb(cmd);
+// 		cmd->ctrl_resp_cb(cmd);
         }
         
-	if (cmd->free_buffer_handle) {
-		if (cmd->free_buffer_func) {
-			cmd->free_buffer_func(cmd->free_buffer_handle);
-		}
-	}
+// 	if (cmd->free_buffer_handle) {
+// 		if (cmd->free_buffer_func) {
+// 			cmd->free_buffer_func(cmd->free_buffer_handle);
+// 		}
+// 	}
 	
 // 	if(tx_data)
 //           free(tx_data);
@@ -1589,7 +1647,7 @@ err:
 //           free(vendor_data_buf);
 //         if(payload_buf)
 //           free(payload_buf);
-  
+	
 	return ret;
 }
 
@@ -1600,11 +1658,13 @@ err:
   */
 nrc_err_t set_wifi_mode(ctrl_cmd_t *cmd)
 {
+  nrc_usr_print("[%s]\n", __func__);
+  
   if(!cmd)
     return NRC_FAIL;
   
   cmd->msg_id = CTRL_REQ_SET_WIFI_MODE;
-  cmd->u.wifi_mode.mode = ESP_WIFI_MODE_STA;
+  cmd->u.wifi_mode.mode = ESP_WIFI_MODE_AP;
   
   return esp_send_req(cmd);
 }
@@ -1614,6 +1674,8 @@ nrc_err_t netdev_transmit(esp32_mac_t* esp32_mac, uint8_t* buffer, uint16_t leng
   interface_buffer_handle_t buf_handle = {0};
   uint8_t iface_type = 0;
   uint8_t iface_num = 0; 
+  
+  nrc_usr_print("[%s]\n", __func__);
   
   if(!buffer || !length || length > MAX_ESP_PAYLOAD_SIZE)
     return NRC_FAIL;
@@ -1711,9 +1773,8 @@ static void reset_esp32(void)
  * @returns nrc_err_t
  */
 
-#define TX_TASK_STACK_SIZE 1024
-#define RX_TASK_STACK_SIZE 1024
-nrc_err_t init_queues(void)
+#define RX_TASK_STACK_SIZE 2048
+nrc_err_t init_wifi_gw(void)
 {
   tx_queue = xQueueCreate(5, sizeof(interface_buffer_handle_t)); 
   assert(tx_queue);
@@ -1733,14 +1794,6 @@ nrc_err_t init_queues(void)
   semaphore_rx_serial = xSemaphoreCreateBinary();
   assert(semaphore_rx_serial);
   
-//   xTaskCreate(tx_task,
-//               "tx_task",
-//               TX_TASK_STACK_SIZE,
-//               NULL,
-//               configMAX_PRIORITIES - 1,
-//               &tx_task_id);
-//   assert(tx_task_id);
-  
   xTaskCreate(rx_task,
               "rx_task",
               RX_TASK_STACK_SIZE,
@@ -1748,12 +1801,12 @@ nrc_err_t init_queues(void)
               configMAX_PRIORITIES - 1,
               &rx_task_id);
 
-//   xTaskCreate(rx_serial_task,
-//               "rx_serial_task",
-//               RX_TASK_STACK_SIZE,
-//               NULL,
-//               configMAX_PRIORITIES - 2,
-//               &rx_serial_task_id);
+  xTaskCreate(rx_serial_task,
+              "rx_serial_task",
+              RX_TASK_STACK_SIZE,
+              NULL,
+              configMAX_PRIORITIES - 2,
+              &rx_serial_task_id);
   
   _delay_ms(100);
   
@@ -1768,7 +1821,7 @@ nrc_err_t init_queues(void)
  * @param none
  * @returns nrc_err_t
  */
-nrc_err_t shutdown_queues(void)
+nrc_err_t shutdown_wifi_gw(void)
 {
   nrc_spi_enable(&esp_spi, false);
 
@@ -1791,9 +1844,6 @@ nrc_err_t shutdown_queues(void)
     vQueueDelete( rx_queue_serial );
     rx_queue_serial = NULL;
   }
-
-  if(tx_task_id)
-    vTaskDelete( tx_task_id);
   
   if(rx_task_id)
     vTaskDelete( rx_task_id);
@@ -1882,9 +1932,9 @@ td_check_wifi_gw_hat(void)
 {
   int gpio_rx_data_ready_pin_val = GPIO_LEVEL_LOW;
   int gpio_handshake = GPIO_LEVEL_LOW;
+  ctrl_cmd_t cmd;
 
-  nrc_usr_print("[%s]\n", __func__);
-  
+  nrc_usr_print("[%s]\n", __func__);  
   reset_esp32();
 
   nrc_gpio_inputb(GPIO_HANDSHAKE_PIN, &gpio_handshake);
@@ -1896,14 +1946,16 @@ td_check_wifi_gw_hat(void)
 
   if(!wifi_init_done){  
     init_spi();
-    init_queues();
+    init_wifi_gw();
   }
 
-  if(wifi_gw_exists) {
+  if(wifi_gw_exists) {	    
+    memset(&cmd, 0, sizeof(ctrl_cmd_t));
+    td_init_esp_wifi(&cmd);
     return NRC_SUCCESS;
   }
   else {
-    shutdown_queues();
+    shutdown_wifi_gw();
   }
   
   return NRC_FAIL;

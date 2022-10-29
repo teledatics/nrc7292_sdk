@@ -99,6 +99,7 @@ td_init_accessories(td_wifi_config_t* tf_config)
     nrc_usr_print("[%s] no accessories found\n", __func__);
 #if defined(SUPPORT_SHT30) || defined(SUPPORT_SGP30)
     td_shutdown_air_quality_hat();
+    shutdown_wifi_gw();
 #endif
   }
 
@@ -125,6 +126,27 @@ td_init_accessories(td_wifi_config_t* tf_config)
   }
 
   nrc_usr_print("[%s] exit\n", __func__);
+  
+  return NRC_SUCCESS;
+}
+
+/**
+ * @brief Shutdown attached accessories
+ *
+ * Run any necessary shutdown routines for accessories
+ *
+ * @param wifi configuration ptr
+ * @returns nrc_err_t
+ */
+nrc_err_t
+td_shutdown_accessories(td_wifi_config_t* tf_config)
+{
+  if(has_air_quality_hat(tf_config)){
+    td_shutdown_air_quality_hat();
+  }
+  else if (has_wifi_gw_hat(tf_config)) {
+    return shutdown_wifi_gw();
+  }
   
   return NRC_SUCCESS;
 }
