@@ -183,6 +183,7 @@ ethernet_input(struct pbuf *p, struct netif *netif)
         goto free_and_return;
       } else {
         /* pass to IP layer */
+        LWIP_DEBUGF(ETHARP_DEBUG | LWIP_DBG_TRACE, ("ip4_input\n"));
         ip4_input(p, netif);
       }
       break;

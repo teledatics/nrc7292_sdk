@@ -404,10 +404,12 @@ static int wpa_ps_hook_handle_dhcp(struct retention_info *ret_info, void *param1
 	struct eth_addr bssid;
 
 	E(TT_WPAS, TAG "%d dhcp\n",  vif_id);
+	nrc_usr_print("[%s] %d dhcp\n",  __func__, vif_id);
 
 	/* Check IP validity */
 	if (ret_info->ip_info.ip_addr == 0) {
 		E(TT_WPAS, TAG "%s IP is invalid in Retention\n", __func__);
+		nrc_usr_print("[%s] IP is invalid in Retention\n",  __func__);
 		ret_info->recovered = false;
 		return WPA_PS_HOOK_RET_FAIL_NO_IP;
 	}
@@ -427,15 +429,20 @@ static int wpa_ps_hook_handle_dhcp(struct retention_info *ret_info, void *param1
 	adrs.addr = ret_info->ip_info.gw_addr;
 	memcpy(bssid.addr, ret_info->ap_info.bssid, 6);
 	err = etharp_add_static_entry(&adrs, &bssid);
-	if(err != ERR_OK)
+	if(err != ERR_OK) {
 		E(TT_WPAS, TAG "%s Fail to add ethar (err:%d)\n", __func__, err);
-	else
+		nrc_usr_print("[%s] Fail to add ethar (err:%d)\n", __func__, err);
+	}
+	else {
 		E(TT_WPAS, TAG "%d add arp\n", vif_id);
+		nrc_usr_print("[%s] %d add arp\n",  __func__, vif_id);
+	}
 
 	/* Send Null for informing AP of Awake */
 	lmac_send_qos_null_frame(false);
 
 	E(TT_WPAS, TAG "%d recovery is done\n", vif_id);
+	nrc_usr_print("[%s] %d recovery is done\n",  __func__, vif_id);
 	ret_info->recovered = false;
 
 	return WPA_PS_HOOK_RET_SUCCESS;

@@ -18,7 +18,7 @@
 
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
 #include "nrc_eth_if.h"
-
+#include "lmac_common.h"
 extern struct netif br_netif;
 #endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 
@@ -80,7 +80,9 @@ int wifi_station_dhcpc_start(int vif)
 	target_if = nrc_netif[vif];
 #endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 
+	A("[%s] wifi_station_dhcpc_status(%d) %d\n", __func__, vif, wifi_station_dhcpc_status(vif));
 	if(wifi_station_dhcpc_status(vif)){
+		A("[%s] stopping dhcp\n", __func__, vif, wifi_station_dhcpc_status(vif));
 		dhcp_stop(target_if);
 		dhcp_cleanup(target_if);
 		dhcpc_start_flag[vif] = false;
@@ -98,13 +100,27 @@ int wifi_station_dhcpc_start(int vif)
 	}
 	I(TT_NET, "%s%d dhcp client start, ret:%d\n",
 		module_name(), vif, ret);
+	
+	A("[%s] dhcpc_start_flag(%d) %d\n", __func__, vif, dhcpc_start_flag[vif]);
     return true;
 }
 
 int wifi_station_dhcpc_stop(int vif)
 {
+	struct netif *target_if;
+
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+	if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+		A("[%s] stop dhcp client on bridge...\n", __func__);
+		target_if = &br_netif;
+	} else {
+		target_if = nrc_netif[vif];
+	}
+#else
+	target_if = nrc_netif[vif];
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 	if (wifi_station_dhcpc_status(vif) == true) {
-		dhcp_stop(nrc_netif[vif]);
+		dhcp_stop(target_if);
 	}
 	dhcpc_start_flag[vif] = false;
 	I(TT_NET, "%s%d stop dhcp client\n",
@@ -119,16 +135,29 @@ int wifi_station_dhcpc_status(int vif)
 
 void reset_ip_address(int vif)
 {
+	struct netif *target_if;
+
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+	if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+		A("[%s] starting dhcp client on bridge...\n", __func__);
+		target_if = &br_netif;
+	} else {
+		target_if = nrc_netif[vif];
+	}
+#else
+	target_if = nrc_netif[vif];
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+	
 	I(TT_NET, "%s%d reset_ip_address after disassociation\n",
 		module_name(), vif);
 
-	dhcp_stop(nrc_netif[vif]);
-	dhcp_cleanup(nrc_netif[vif]);
+	dhcp_stop(target_if);
+	dhcp_cleanup(target_if);
 	dhcpc_start_flag[vif] = false;
 
-	ip4_addr_set_zero(&nrc_netif[vif]->ip_addr);
-	ip4_addr_set_zero(&nrc_netif[vif]->netmask);
-	ip4_addr_set_zero(&nrc_netif[vif]->gw);
+	ip4_addr_set_zero(&target_if->ip_addr);
+	ip4_addr_set_zero(&target_if->netmask);
+	ip4_addr_set_zero(&target_if->gw);
 }
 
 void wifi_ifconfig_help_display(void)
@@ -138,16 +167,11 @@ void wifi_ifconfig_help_display(void)
 	A("   ifconfig <interface> [mtu <NN>]\n");
 }
 
-void wifi_ifconfig_display(WIFI_INTERFACE if_index)
+void netif_ifconfig_display(struct netif *netif)
 {
-	struct netif *netif = nrc_netif[if_index];
-	int i = 0;
-
-	/* LWIP netif default index starts from 1, so adjust it by subtracting 1 */
-	A("wlan%d      ", netif_get_index(netif) - 1);
 	A("HWaddr ");
 	A(MAC_STR,MAC_VALUE(netif->hwaddr) );
-	A("   MTU:%d\n", netif->mtu);
+	A("   MTU:%d %s\n", netif->mtu, netif_is_up(netif) ? "Up" : "Down");
 	A("           inet:");
 	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->ip_addr));
 	A("\tnetmask:");
@@ -155,6 +179,16 @@ void wifi_ifconfig_display(WIFI_INTERFACE if_index)
 	A("\tgateway:");
 	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->gw));
 	A("\n");
+}
+void wifi_ifconfig_display(WIFI_INTERFACE if_index)
+{
+	struct netif *netif = nrc_netif[if_index];
+	int i = 0;
+
+	i = netif_get_index(netif) - 1;
+	/* LWIP netif default index starts from 1, so adjust it by subtracting 1 */
+	A("wlan%d (P%d)  ", i, lmac_get_promiscuous_mode(i));
+	netif_ifconfig_display(netif);
 }
 
 
@@ -168,35 +202,17 @@ extern struct netif eth_netif;
 
 void eth_ifconfig_display(void)
 {
-	struct netif *netif_temp = &eth_netif;
+	struct netif *netif = &eth_netif;
 
 	A("eth        ");
-	A("HWaddr ");
-	A(MAC_STR,MAC_VALUE(netif_temp->hwaddr) );
-	A("   MTU:%d\n", netif_temp->mtu);
-	A("          inet addr:");
-	A(IP4_ADDR_STR,IP4_ADDR_VALUE(&(netif_temp->ip_addr)) );
-	A("   Mask:");
-	A(IP4_ADDR_STR,IP4_ADDR_VALUE(&(netif_temp->netmask)) );
-	A("   Gw:");
-	A(IP4_ADDR_STR,IP4_ADDR_VALUE(&(netif_temp->gw)) );
-	A("\n");
+	netif_ifconfig_display(netif);
 }
 
 void br_ifconfig_display(void)
 {
-	struct netif *netif_temp = &br_netif;
+	struct netif *netif = &br_netif;
 	A("br         ");
-	A("HWaddr ");
-	A(MAC_STR,MAC_VALUE(netif_temp->hwaddr) );
-	A("   MTU:%d\n", netif_temp->mtu);
-	A("          inet addr:");
-	A(IP4_ADDR_STR,IP4_ADDR_VALUE(&(netif_temp->ip_addr)) );
-	A("   Mask:");
-	A(IP4_ADDR_STR,IP4_ADDR_VALUE(&(netif_temp->netmask)) );
-	A("   Gw:");
-	A(IP4_ADDR_STR,IP4_ADDR_VALUE(&(netif_temp->gw)) );
-	A("\n");
+	netif_ifconfig_display(netif);
 }
 #endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 
@@ -292,15 +308,41 @@ bool wifi_ifconfig(int num_param, char *params[])
 
 bool wifi_set_ip_info(WIFI_INTERFACE if_index, struct ip_info *info)
 {
-	netif_set_addr(nrc_netif[if_index], &info->ip,  &info->netmask, &info->gw);
+	struct netif *target_if;
+
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+	if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+		A("[%s] starting dhcp client on bridge...\n", __func__);
+		target_if = &br_netif;
+	} else {
+		target_if = nrc_netif[if_index];
+	}
+#else
+	target_if = nrc_netif[if_index];
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+	
+	netif_set_addr(target_if, &info->ip,  &info->netmask, &info->gw);
 	return true;
 }
 
 bool wifi_get_ip_info(WIFI_INTERFACE if_index, struct ip_info *info)
 {
-	info->ip = (nrc_netif[if_index])->ip_addr;
-	info->netmask = (nrc_netif[if_index])->netmask;
-	info->gw = (nrc_netif[if_index])->gw;
+	struct netif *target_if;
+
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+	if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+		A("[%s] starting dhcp client on bridge...\n", __func__);
+		target_if = &br_netif;
+	} else {
+		target_if = nrc_netif[if_index];
+	}
+#else
+	target_if = nrc_netif[if_index];
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+	
+	info->ip = (target_if)->ip_addr;
+	info->netmask = (target_if)->netmask;
+	info->gw = (target_if)->gw;
 	return true;
 }
 

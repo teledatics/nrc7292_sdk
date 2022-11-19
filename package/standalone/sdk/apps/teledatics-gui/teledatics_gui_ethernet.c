@@ -212,6 +212,7 @@ td_check_ethernet_hat(void)
 
   /* reset chip */
   nrc_gpio_outputb(GPIO_09, GPIO_LEVEL_LOW);
+  _delay_ms(100);
   nrc_gpio_outputb(GPIO_09, GPIO_LEVEL_HIGH);
   _delay_ms(100);
 
@@ -240,6 +241,12 @@ td_check_ethernet_hat(void)
   nrc_usr_print("chip RevID: 0x%02x\n", rev);
   nrc_spi_enable(&spi, false);
 
+  /* reset chip */
+  nrc_gpio_outputb(GPIO_09, GPIO_LEVEL_LOW);
+  _delay_ms(100);
+  nrc_gpio_outputb(GPIO_09, GPIO_LEVEL_HIGH);
+  _delay_ms(100);
+  
   if (rev >= ENC28J60_REV_B1 && rev <= ENC28J60_REV_B7) {
     return NRC_SUCCESS;
   }

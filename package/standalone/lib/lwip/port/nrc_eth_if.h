@@ -25,6 +25,7 @@ nrc_err_t set_network_mode(nrc_network_mode_t mode);
 nrc_network_mode_t get_network_mode();
 nrc_err_t ethernet_init(uint8_t *mac_addr);
 #if defined(SUPPORT_ETHERNET_ACCESSPOINT)
+void reset_peer_mac(void);
 void set_peer_mac(const uint8_t *eth);
 struct eth_addr *get_peer_mac(void);
 #endif

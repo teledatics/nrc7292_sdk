@@ -291,6 +291,7 @@ esp_eth_driver_install(const esp_eth_config_t* config,
   phy->reset_hw(phy);
   // init MAC first, so that MAC can generate the correct SMI signals
   ESP_GOTO_ON_ERROR(mac->init(mac), err, TAG, "init mac failed");
+  vTaskDelay(pdMS_TO_TICKS(10));
   ESP_GOTO_ON_ERROR(phy->init(phy), err, TAG, "init phy failed");
   // get default status of PHY autonegotiation (ultimately may also indicate if
   // it is supported)

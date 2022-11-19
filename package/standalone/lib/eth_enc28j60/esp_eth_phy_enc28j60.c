@@ -124,7 +124,8 @@ enc28j60_reset_config(NRC_GPIO_PIN gpio_num)
 
   config.gpio_pin = gpio_num;
   config.gpio_dir = GPIO_OUTPUT;
-  config.gpio_mode = GPIO_PULL_UP;
+  config.gpio_mode = GPIO_FLOATING;
+  config.gpio_alt = GPIO_FUNC;
 
   nrc_gpio_config(&config);
 }

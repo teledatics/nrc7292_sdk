@@ -279,7 +279,7 @@ extern "C"
 #define ETH_PHY_DEFAULT_CONFIG()                                               \
   {                                                                            \
     .phy_addr = ESP_ETH_PHY_ADDR_AUTO, .reset_timeout_ms = 100,                \
-    .autonego_timeout_ms = 4000, .reset_gpio_num = 5,                          \
+    .autonego_timeout_ms = 4000, .reset_gpio_num = -1,                          \
   }
 
   /**

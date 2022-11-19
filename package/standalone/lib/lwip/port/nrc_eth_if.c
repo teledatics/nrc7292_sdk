@@ -10,6 +10,7 @@
 #include "netif/etharp.h"
 #include "netif/bridgeif.h"
 
+#include "standalone.h"
 #include "nrc_wifi.h"
 #include "driver_nrc.h"
 
@@ -32,6 +33,7 @@ struct netif br_netif;
 bridgeif_initdata_t bridge_data;
 #if defined(SUPPORT_ETHERNET_ACCESSPOINT)
 struct eth_addr peer_mac;
+uint8_t * get_umac_apinfo_bssid(int8_t vif_id);
 #endif
 
 static esp_eth_mac_t *nrc_eth_mac;
@@ -130,7 +132,11 @@ static void status_callback(struct netif *eth_if)
 			nrc_usr_print("[%s] netif_is_up, local interface IP is %s\n",
 					  __func__,
 					  ip4addr_ntoa(netif_ip4_addr(target_if)));
-			nrc_usr_print("[%s] IP is ready\n", __func__);
+// 			nrc_usr_print("[%s] IP is ready\n", __func__);
+			set_dhcp_status(true);
+			set_standalone_ipaddr(0, target_if->ip_addr.addr,
+				target_if->netmask.addr, target_if->gw.addr);
+			
 		}
 	} else {
 		nrc_usr_print("[%s] netif_is_down\n", __func__);
@@ -171,19 +177,23 @@ static void nrc_bind_eth_if(esp_eth_mac_t *mac)
     netif_set_up(&eth_netif);
 
 	if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
+		
+		nrc_usr_print("[%s] setup bridge\n", __func__);
+		
 		if (eth_mode == NRC_ETH_MODE_AP) {
 			memcpy(bridge_data.ethaddr.addr, eth_netif.hwaddr, 6);
 		} else {
 			memcpy(bridge_data.ethaddr.addr, nrc_netif[0]->hwaddr, 6);
+			set_peer_mac(eth_netif.hwaddr);
 		}
-		bridge_data.max_ports = 2;
+		bridge_data.max_ports = 3;
 		bridge_data.max_fdb_dynamic_entries = 128;
 		bridge_data.max_fdb_static_entries = 16;
 
 		netif_add(&br_netif, &ipaddr, &netmask, &gw, &bridge_data, bridgeif_init, ethernet_input);
 		
 		bridgeif_add_port(&br_netif, &eth_netif);
-
+		
 		bridgeif_add_port(&br_netif, nrc_netif[0]);
 		
 		bridgeif_add_port(&br_netif, nrc_netif[1]);
@@ -191,6 +201,7 @@ static void nrc_bind_eth_if(esp_eth_mac_t *mac)
 		bridgeif_fdb_add(&br_netif, &ethbroadcast, BR_FLOOD);
 		netif_set_default(&br_netif);
 		netif_set_up(&br_netif);
+		reset_peer_mac();
 	} else {
 		if (eth_mode == NRC_ETH_MODE_AP) {
 			netif_set_default(&eth_netif);
@@ -229,21 +240,21 @@ static nrc_err_t eth_stack_input_handler(esp_eth_handle_t eth_handle, uint8_t *b
 	struct nrc_wpa_if *intf = wpa_driver_get_interface(0);
 	struct nrc_wpa_sta *sta = NULL;
 
-	if (eth_mode == NRC_ETH_MODE_AP) {
-		if (intf) {
+// 	if (eth_mode == NRC_ETH_MODE_AP) {
+// 		if (intf) {
 // 			nrc_usr_print("[%s] nrc_wpa_if found...\n", __func__);
-			if (intf->is_ap) {
-				sta = nrc_wpa_find_sta(intf, ethhdr->dest.addr);
-				if (sta) {
+// 			if (intf->is_ap) {
+// 				sta = nrc_wpa_find_sta(intf, ethhdr->dest.addr);
+// 				if (sta) {
 // 					nrc_usr_print("[%s] station found ...\n", __func__);
-				} else {
+// 				} else {
 // 					nrc_usr_print("[%s] station not found...\n", __func__);
-				}
-			} else {
+// 				}
+// 			} else {
 // 				nrc_usr_print("[%s] nrc_wpa_if not AP...\n", __func__);
-			}
-		}
-	}
+// 			}
+// 		}
+// 	}
 // 	nrc_usr_print("[%s] buffer of size %d received...\n", __func__, length);
 //	print_buffer(buffer, length);
 
@@ -257,6 +268,20 @@ static nrc_err_t eth_stack_input_handler(esp_eth_handle_t eth_handle, uint8_t *b
 	switch (htons(ethhdr->type)) {
 		/* IP or ARP packet? */
 		case ETHTYPE_ARP:
+// 		nrc_usr_print("[%s] ETHTYPE_ARP pkt received, NRC_ETH_MODE_AP %d peer_mac ("MACSTR")\n", __func__, (eth_mode == NRC_ETH_MODE_AP), MAC2STR(get_peer_mac()->addr));
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT)
+		// add Ethernet peer mac adress for ARP sppofing
+		if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
+			if(eth_mode != NRC_ETH_MODE_AP && 
+			   ((get_peer_mac()->addr[0] == 0 && get_peer_mac()->addr[1] == 0) ||
+			    !memcmp(ethhdr->src.addr, eth_netif.hwaddr, ETH_HWADDR_LEN) ||
+			    !memcmp(ethhdr->src.addr, nrc_netif[0]->hwaddr, ETH_HWADDR_LEN) ||
+			    !memcmp(ethhdr->src.addr, get_umac_apinfo_bssid(0), ETH_HWADDR_LEN))) {
+				nrc_usr_print("[%s] setting peer_mac to ("MACSTR")\n", __func__, MAC2STR(ethhdr->src.addr));
+					set_peer_mac(ethhdr->src.addr);
+			}
+		}
+#endif
 #if PPPOE_SUPPORT
 		/* PPPoE packet? */
 		case ETHTYPE_PPPOEDISC:
@@ -264,6 +289,7 @@ static nrc_err_t eth_stack_input_handler(esp_eth_handle_t eth_handle, uint8_t *b
 #endif /* PPPOE_SUPPORT */
 		case ETHTYPE_IP:
 			if (eth_copy_buffer_to_pbuf(buffer, length, &p) == NRC_FAIL) {
+				nrc_usr_print("[%s] eth_copy_buffer_to_pbuf failed\n", __func__);
 				free(buffer);
 				return NRC_FAIL;
 			} else {
@@ -317,6 +343,7 @@ static nrc_err_t eth_linkdown_handler(esp_eth_handle_t eth_handle)
 #endif
 	} else {
 		if (eth_dhcp_started) {
+			nrc_usr_print("[%s] stop dhcp...\n", __func__);
 			dhcp_stop(&eth_netif);
 			dhcp_cleanup(&eth_netif);
 		}
@@ -335,6 +362,7 @@ nrc_err_t set_ethernet_mode(nrc_eth_mode_t mode)
 	eth_mode = mode;
 
 	if (eth_mode == NRC_ETH_MODE_STA) {
+nrc_usr_print("[%s] stop dhcp...\n", __func__);
 		if (eth_dhcp_started) {
 			dhcp_stop(&eth_netif);
 			dhcp_cleanup(&eth_netif);
@@ -432,13 +460,26 @@ nrc_err_t ethernet_init(uint8_t *mac_addr)
 }
 
 #if defined(SUPPORT_ETHERNET_ACCESSPOINT)
-void set_peer_mac(const uint8_t *eth)
+void reset_peer_mac(void)
 {
-	memcpy(peer_mac.addr, eth, ETH_HWADDR_LEN);
+	memset(&peer_mac, 0, sizeof(peer_mac));
 }
 
+void set_peer_mac(const uint8_t *eth)
+{
+	if((peer_mac.addr[0] == 0 && peer_mac.addr[1] == 0) ||
+	   !memcmp(peer_mac.addr, nrc_netif[0]->hwaddr, ETH_HWADDR_LEN)) {
+		memcpy(peer_mac.addr, eth, ETH_HWADDR_LEN);
+	}
+}
+
+uint8_t * get_umac_apinfo_bssid(int8_t vif_id);
 struct eth_addr *get_peer_mac()
 {
+// 	uint8_t eth_mac[ETH_HWADDR_LEN] = {0x8c, 0x16, 0x45, 0x12, 0x3b, 0x3c};
+// 	memcpy(peer_mac.addr, eth_mac, ETH_HWADDR_LEN);
+// 	memcpy(peer_mac.addr, eth_netif.hwaddr, ETH_HWADDR_LEN);
+// 	memcpy(peer_mac.addr, get_umac_apinfo_bssid(0), ETH_HWADDR_LEN);
 	return &peer_mac;
 }
 #endif

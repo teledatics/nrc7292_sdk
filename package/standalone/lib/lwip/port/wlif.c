@@ -16,6 +16,8 @@
 #include "nrc_eth_if.h"
 #endif
 
+#include "nrc_sdk.h"
+
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
 
@@ -97,6 +99,9 @@ void lwif_input_from_net80211_pbuf(struct pbuf* p)
 {
 	struct eth_hdr      *ethhdr;
 	struct netif *netif = nrc_netif[0];
+	
+nrc_usr_print("[%s] \n", __func__);
+
 	if (p != NULL) {
 		LINK_STATS_INC(link.recv);
 	} else {
@@ -175,25 +180,34 @@ void lwif_input(uint8_t vif_id, void *buffer, int data_len, bool is_ap)
 			if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 				u32 target_ip_addr;
 				arp_hdr = (struct etharp_hdr *)(p->payload + SIZEOF_ETH_HDR);
-				V(TT_NET, "[ARP][%s] ", htons(arp_hdr->opcode) == 1 ? "REQ" : "REP");
-				V(TT_NET, "dst("MACSTR"), src("MACSTR")\n", MAC2STR(ethhdr->dest.addr), MAC2STR(ethhdr->src.addr));
+// 				V(TT_NET, "[ARP][%s] ", htons(arp_hdr->opcode) == 1 ? "REQ" : "REP");
+// 				V(TT_NET, "dst("MACSTR"), src("MACSTR")\n", MAC2STR(ethhdr->dest.addr), MAC2STR(ethhdr->src.addr));
+// 				nrc_usr_print("[ARP][%s] ", htons(arp_hdr->opcode) == 1 ? "REQ" : "REP");
+// 				nrc_usr_print("dst("MACSTR"), src("MACSTR") target_ip ", MAC2STR(ethhdr->dest.addr), MAC2STR(ethhdr->src.addr));
 				target_ip_addr = arp_hdr->dipaddr.addrw[1];
 				target_ip_addr = (target_ip_addr << 16) | arp_hdr->dipaddr.addrw[0];
+// 				nrc_usr_print("%d.%d.%d.%d\n", ((target_ip_addr >> 24) & 0xFF), ((target_ip_addr >> 16) & 0xFF), ((target_ip_addr >> 8) & 0xFF), ((target_ip_addr) & 0xFF));
 				if (!is_ap) { // br0 mac == wlan0 mac
+// 					print_hex(p, p->len);
 					if (htons(arp_hdr->opcode) == 1) { // ARP Request
 						if (!memcmp(arp_hdr->shwaddr.addr, netif->hwaddr, 6)) {
-							goto pbuf_free;
+// 							nrc_usr_print("[%s] arp_hdr->shwaddr.addr != netif->hwaddr ... drop pkt\n", __func__);
+							pbuf_free;
 						} else {
 							if (target_ip_addr != br_netif.ip_addr.addr &&
 								!(ethhdr->dest.addr[0] & 1)) {
+// 								nrc_usr_print("[%s] target_ip_addr != br_netif.ip_addr.addr, subst peer mac\n", __func__);
 								memcpy(ethhdr->dest.addr, get_peer_mac()->addr, 6);
+// 								nrc_usr_print("peer("MACSTR")\n", MAC2STR(get_peer_mac()->addr));
 							}
 						}
 					} else { // ARP Reply
 						if (!memcmp(arp_hdr->dhwaddr.addr, netif->hwaddr, 6) &&
 							target_ip_addr != br_netif.ip_addr.addr) {
+// 							nrc_usr_print("[%s] ARP reply subst peer mac\n", __func__);
 							memcpy(ethhdr->dest.addr, get_peer_mac()->addr, 6);
 							memcpy(arp_hdr->dhwaddr.addr, get_peer_mac()->addr, 6);
+// 							nrc_usr_print("peer("MACSTR")\n", MAC2STR(get_peer_mac()->addr));
 						}
 					}
 				}
@@ -214,7 +228,9 @@ void lwif_input(uint8_t vif_id, void *buffer, int data_len, bool is_ap)
 				ip_hdr = (struct ip_hdr *)(p->payload + SIZEOF_ETH_HDR);
 				if (!is_ap) { // br0 mac == wlan0 mac
 					if (ip_hdr->dest.addr != 0 && ip_hdr->dest.addr != 0xffffffff &&
-						ip_hdr->dest.addr != br_netif.ip_addr.addr) {
+						br_netif.ip_addr.addr != 0 && ip_hdr->dest.addr != br_netif.ip_addr.addr) {
+// 						nrc_usr_print("dst ip %d.%d.%d.%d\n", ((ip_hdr->dest.addr >> 0) & 0xFF), ((ip_hdr->dest.addr >> 8) & 0xFF), ((ip_hdr->dest.addr >> 16) & 0xFF), ((ip_hdr->dest.addr >> 24) & 0xFF));
+// 						nrc_usr_print("[%s] ip_hdr->dest.addr != 0 && ip_hdr->dest.addr != 0xffffffff && ip_hdr->dest.addr != br_netif.ip_addr.addr ... subst peer mac\n", __func__);
 						memcpy(ethhdr->dest.addr, get_peer_mac()->addr, 6);
 					}
 				}

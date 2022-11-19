@@ -113,6 +113,12 @@ td_init_accessories(td_wifi_config_t* tf_config)
     uint8_t* eth_mac;
     set_network_mode(NRC_NETWORK_MODE_BRIDGE);
     eth_mac = get_eth_standalone_macaddr();
+    if(WIFI_MODE_AP == tf_config->wifi_mode) {
+      set_ethernet_mode(NRC_ETH_MODE_AP);
+    }
+    else {
+      set_ethernet_mode(NRC_ETH_MODE_STA);
+    }
     ethernet_init(eth_mac);
 #endif
   }
@@ -121,6 +127,12 @@ td_init_accessories(td_wifi_config_t* tf_config)
     uint8_t* esp32_mac;
     set_network_mode(NRC_NETWORK_MODE_BRIDGE);
     esp32_mac = get_eth_standalone_macaddr();
+    if(WIFI_MODE_AP == tf_config->wifi_mode) {
+      set_ethernet_mode(NRC_ETH_MODE_AP);
+    }
+    else {
+      set_ethernet_mode(NRC_ETH_MODE_STA);
+    }
     esp32_init(esp32_mac);
 #endif
   }
