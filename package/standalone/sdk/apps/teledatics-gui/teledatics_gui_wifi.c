@@ -375,9 +375,9 @@ td_wifi_connect(td_wifi_config_t* tf_config)
   }
 
   // static IP, run server now
-//   if (tf_config->nrc_wifi_config.ip_mode == WIFI_STATIC_IP) {
-//     run_http_server(tf_config);
-//   }
+  if (tf_config->nrc_wifi_config.ip_mode == WIFI_STATIC_IP) {
+    run_http_server(tf_config);
+  }
 
   return WIFI_SUCCESS;
 }
